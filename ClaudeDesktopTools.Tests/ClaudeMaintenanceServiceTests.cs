@@ -124,6 +124,20 @@ public class ClaudeMaintenanceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetStaleTranscriptsAsync_ReturnsOnlyEligibleFilesWithProjectNameAndId()
+    {
+        _service.UpdateSettings(new ClaudeMaintenanceSettings { TranscriptRetentionDays = 30 });
+        WriteTranscript("old-session.jsonl", ageInDays: 90);
+        WriteTranscript("recent.jsonl", ageInDays: 1);
+
+        var preview = await _service.GetStaleTranscriptsAsync();
+
+        var item = Assert.Single(preview);
+        Assert.Equal("old-session", item.SessionId);
+        Assert.Equal("C--test-repo", item.WorkingDirectory);
+    }
+
+    [Fact]
     public async Task ArchiveStaleSessionsAsync_FlipsTheFlagOnlyOnStaleUnarchivedSessions()
     {
         _service.UpdateSettings(new ClaudeMaintenanceSettings { SessionRetentionDays = 7 });

@@ -28,6 +28,7 @@ public partial class App : Application
                 // Core Services
                 services.AddSingleton<IClaudeMaintenanceService, ClaudeMaintenanceService>();
                 services.AddSingleton<IClaudeConfigDiscoveryService, ClaudeConfigDiscoveryService>();
+                services.AddSingleton<IDriveSyncService, DriveSyncService>();
 
                 // ViewModels
                 services.AddTransient<DashboardViewModel>();

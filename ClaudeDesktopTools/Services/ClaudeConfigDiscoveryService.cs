@@ -36,6 +36,11 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         new Regex(@"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*", RegexOptions.Compiled)
     };
 
+    private static readonly HashSet<string> HookScriptExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".ps1", ".sh", ".py", ".js", ".cmd", ".bat"
+    };
+
     private readonly string _gitExecutable;
 
     public ClaudeConfigDiscoveryService(string gitExecutable = "git")
@@ -51,6 +56,8 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
 
         var repoCandidateMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var directCandidates = new List<string>();
+        var categoryByPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var explicitRelativePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Enumerate candidates using BFS
         var queue = new Queue<(string Path, int Depth)>();
@@ -65,26 +72,34 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
             {
                 // Look for CLAUDE.md directly in current folder
                 var claudeFile = Path.Combine(currentDir, "CLAUDE.md");
-                if (File.Exists(claudeFile) && IsCandidateAllowed(claudeFile))
+                var hasRootClaudeFile = File.Exists(claudeFile);
+                if (hasRootClaudeFile && IsCandidateAllowed(claudeFile))
                 {
                     directCandidates.Add(claudeFile);
                 }
 
-                // Look for references/ folder or .claude/references
-                var refDir = Path.Combine(currentDir, "references");
-                if (Directory.Exists(refDir))
+                var dotClaudeDir = Path.Combine(currentDir, ".claude");
+                var hasDotClaudeFile = File.Exists(Path.Combine(dotClaudeDir, "CLAUDE.md"));
+
+                // A top-level references/ folder only belongs to Claude if this same
+                // directory is already a confirmed Claude context (has CLAUDE.md here or
+                // under .claude/) -- otherwise it's just as likely another tool's docs (e.g. Gemini).
+                if (hasRootClaudeFile || hasDotClaudeFile)
                 {
-                    foreach (var f in SafeEnumerateFiles(refDir, "*.md"))
+                    var refDir = Path.Combine(currentDir, "references");
+                    if (Directory.Exists(refDir))
                     {
-                        if (IsCandidateAllowed(f)) directCandidates.Add(f);
+                        foreach (var f in SafeEnumerateFiles(refDir, "*.md"))
+                        {
+                            if (IsCandidateAllowed(f)) directCandidates.Add(f);
+                        }
                     }
                 }
 
-                var dotClaudeDir = Path.Combine(currentDir, ".claude");
                 if (Directory.Exists(dotClaudeDir))
                 {
                     var dotClaudeFile = Path.Combine(dotClaudeDir, "CLAUDE.md");
-                    if (File.Exists(dotClaudeFile) && IsCandidateAllowed(dotClaudeFile))
+                    if (hasDotClaudeFile && IsCandidateAllowed(dotClaudeFile))
                     {
                         directCandidates.Add(dotClaudeFile);
                     }
@@ -97,6 +112,15 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                             if (IsCandidateAllowed(f)) directCandidates.Add(f);
                         }
                     }
+
+                    // Skills, agents and scheduled tasks are all just Markdown definitions living
+                    // under their own well-known folder -- same discovery rules as references/.
+                    CollectCategoryFiles(dotClaudeDir, "skills", 3, ClaudeDiscoveryCategory.Skill, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+                    CollectCategoryFiles(dotClaudeDir, "agents", 1, ClaudeDiscoveryCategory.Agent, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+                    CollectCategoryFiles(dotClaudeDir, "scheduled-tasks", 3, ClaudeDiscoveryCategory.ScheduledTask, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+                    // Hooks are scripts, not Markdown -- same secret/name filtering, different extension allow-list.
+                    CollectCategoryFiles(dotClaudeDir, "hooks", 1, ClaudeDiscoveryCategory.Hook, IsHookScriptAllowed, directCandidates, categoryByPath, explicitRelativePath);
                 }
             }
             catch { }
@@ -142,8 +166,9 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                 report.Candidates.Add(new ClaudeDiscoveryCandidate
                 {
                     FilePath = file,
-                    RelativePath = Path.GetFileName(file),
+                    RelativePath = explicitRelativePath.TryGetValue(file, out var relPath) ? relPath : Path.GetFileName(file),
                     RepositoryRoot = string.Empty,
+                    Category = categoryByPath.TryGetValue(file, out var category) ? category : ClaudeDiscoveryCategory.Context,
                     IsTrackedByGit = false,
                     FileSizeBytes = fi.Exists ? fi.Length : 0,
                     LastModified = fi.Exists ? fi.LastWriteTime : DateTime.Now
@@ -175,6 +200,7 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                     FilePath = absPath,
                     RelativePath = relPath,
                     RepositoryRoot = repoRoot,
+                    Category = categoryByPath.TryGetValue(absPath, out var candidateCategory) ? candidateCategory : ClaudeDiscoveryCategory.Context,
                     IsTrackedByGit = isTracked,
                     FileSizeBytes = fi.Exists ? fi.Length : 0,
                     LastModified = fi.Exists ? fi.LastWriteTime : DateTime.Now
@@ -227,6 +253,27 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         return true;
     }
 
+    public static bool IsHookScriptAllowed(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (!HookScriptExtensions.Contains(ext))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(filePath);
+        foreach (var keyword in SensitiveNameKeywords)
+        {
+            if (fileName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        if (HasInfrastructureSecret(filePath))
+            return false;
+
+        return true;
+    }
+
     public static bool HasInfrastructureSecret(string filePath)
     {
         try
@@ -252,6 +299,32 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         catch
         {
             return false;
+        }
+    }
+
+    private static void CollectCategoryFiles(
+        string dotClaudeDir,
+        string subfolderName,
+        int maxDepth,
+        string category,
+        Func<string, bool> isAllowed,
+        List<string> directCandidates,
+        Dictionary<string, string> categoryByPath,
+        Dictionary<string, string> explicitRelativePath)
+    {
+        var folder = Path.Combine(dotClaudeDir, subfolderName);
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        foreach (var f in SafeEnumerateFilesRecursive(folder, maxDepth))
+        {
+            if (!isAllowed(f)) continue;
+
+            directCandidates.Add(f);
+            categoryByPath[f] = category;
+            explicitRelativePath[f] = Path.GetRelativePath(dotClaudeDir, f).Replace('\\', '/');
         }
     }
 

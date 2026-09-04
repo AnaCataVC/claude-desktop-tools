@@ -11,7 +11,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
             <TextBlock Text="Descubrimiento de Contexto IA (CLAUDE.md)" Style="{ThemeResource TitleTextBlockStyle}" />
-            <TextBlock Text="Localiza instrucciones de proyecto y referencias de arquitectura con análisis de secretos."
+            <TextBlock Text="Localiza CLAUDE.md, references, skills, agentes, tareas programadas y hooks (con análisis de secretos)."
                        Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
 
@@ -35,6 +35,20 @@
                 <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" VerticalAlignment="Center"
                            Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Command="{x:Bind ViewModel.SyncToDriveCommand}"
+                        IsEnabled="{x:Bind ViewModel.IsDriveConfigured}"
+                        ToolTipService.ToolTip="Configura la Web App de Google Drive en Ajustes para habilitar esto.">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE753;" />
+                        <TextBlock Text="Sincronizar sin seguimiento a Drive" />
+                    </StackPanel>
+                </Button>
+                <ProgressRing IsActive="{x:Bind ViewModel.IsSyncingToDrive, Mode=OneWay}" Width="20" Height="20" />
+                <TextBlock Text="{x:Bind ViewModel.DriveSyncStatusMessage, Mode=OneWay}" VerticalAlignment="Center"
+                           Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </StackPanel>
 
         <!-- Discovered Candidates List -->
@@ -45,7 +59,7 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,4">
-                        <Grid ColumnDefinitions="*, Auto, Auto">
+                        <Grid ColumnDefinitions="*, Auto, Auto, Auto">
                             <StackPanel Grid.Column="0" Spacing="4">
                                 <TextBlock Text="{x:Bind RelativePath}" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                                 <TextBlock Text="{x:Bind FilePath}" Style="{ThemeResource CaptionTextBlockStyle}"
@@ -58,7 +72,13 @@
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" />
                             </StackPanel>
 
-                            <Border Grid.Column="2" VerticalAlignment="Center" CornerRadius="4" Padding="8,4"
+                            <Border Grid.Column="2" VerticalAlignment="Center" CornerRadius="4" Padding="8,4" Margin="0,0,8,0"
+                                    Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                <TextBlock Text="{x:Bind Category}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+                            </Border>
+
+                            <Border Grid.Column="3" VerticalAlignment="Center" CornerRadius="4" Padding="8,4"
                                     Background="{ThemeResource LayerFillColorDefaultBrush}">
                                 <TextBlock Text="{x:Bind StatusBadge}"
                                            Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />

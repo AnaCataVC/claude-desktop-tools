@@ -48,6 +48,40 @@
                 </StackPanel>
             </Border>
 
+            <!-- Google Drive Sync Card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="20">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Copia de Seguridad en Google Drive" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <TextBlock Text="Respalda CLAUDE.md/references, skills, agentes, tareas programadas y hooks sin seguimiento en git a una carpeta de Google Drive, vía un Google Apps Script Web App (sin OAuth)."
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                    <TextBox Header="URL de la Web App (termina en /exec)"
+                             PlaceholderText="https://script.google.com/macros/s/AKfycb.../exec"
+                             Text="{x:Bind ViewModel.DriveWebAppUrl, Mode=TwoWay}" />
+
+                    <PasswordBox Header="Token de autenticación (opcional, si el script lo exige)"
+                                 Password="{x:Bind ViewModel.DriveAuthToken, Mode=TwoWay}" />
+
+                    <TextBox Header="Prefijo de carpeta destino en Drive"
+                             Text="{x:Bind ViewModel.DriveDestinationPrefix, Mode=TwoWay}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Command="{x:Bind ViewModel.TestDriveConnectionCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE701;" />
+                                <TextBlock Text="Probar Conexión" />
+                            </StackPanel>
+                        </Button>
+                        <ProgressRing IsActive="{x:Bind ViewModel.IsTestingDriveConnection, Mode=OneWay}" Width="20" Height="20" />
+                    </StackPanel>
+
+                    <TextBlock Text="{x:Bind ViewModel.DriveStatusMessage, Mode=OneWay}"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
             <!-- About Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"

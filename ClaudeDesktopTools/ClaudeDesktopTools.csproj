@@ -19,6 +19,7 @@
     <FileVersion>1.0.0.0</FileVersion>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;releases\**</DefaultItemExcludes>
+    <SatelliteResourceLanguages>es;en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>

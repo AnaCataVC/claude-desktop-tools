@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.UI.Dispatching;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ClaudeDesktopTools.Models;
@@ -12,7 +13,6 @@ namespace ClaudeDesktopTools.ViewModels;
 public partial class DashboardViewModel : ObservableObject
 {
     private readonly IClaudeMaintenanceService _maintenanceService;
-    private readonly DispatcherQueue _dispatcherQueue;
 
     [ObservableProperty]
     private ClaudeMaintenanceReport _report = new();
@@ -32,7 +32,14 @@ public partial class DashboardViewModel : ObservableObject
     public DashboardViewModel(IClaudeMaintenanceService maintenanceService)
     {
         _maintenanceService = maintenanceService;
-        _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ?? DispatcherQueue.GetForCurrentThread();
+    }
+
+    public Task<List<ClaudeSessionItem>> GetStaleTranscriptsPreviewAsync() => _maintenanceService.GetStaleTranscriptsAsync();
+
+    public async Task<List<ClaudeSessionItem>> GetStaleDesktopSessionsPreviewAsync()
+    {
+        var sessions = await _maintenanceService.GetSessionsAsync();
+        return sessions.Where(s => s.IsStale && !s.IsArchived).ToList();
     }
 
     [RelayCommand]

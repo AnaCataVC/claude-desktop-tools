@@ -73,7 +73,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Command="{x:Bind ViewModel.ArchiveStaleSessionsCommand}">
+                <Button Click="ArchiveStaleSessions_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE7B8;" />
                         <TextBlock Text="Archivar Sesiones Antiguas" />

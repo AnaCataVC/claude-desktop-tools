@@ -95,6 +95,39 @@ public class ClaudeMaintenanceService : IClaudeMaintenanceService
         }, cancellationToken);
     }
 
+    public async Task<List<ClaudeSessionItem>> GetStaleTranscriptsAsync(CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            var list = new List<ClaudeSessionItem>();
+            if (!Directory.Exists(_transcriptsRoot))
+                return list;
+
+            DateTime staleBefore = DateTime.Now.AddDays(-_settings.TranscriptRetentionDays);
+            DateTime activeAfter = DateTime.Now - ActiveSessionGrace;
+
+            foreach (var file in EnumerateFiles(_transcriptsRoot, "*.jsonl"))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!IsEligibleForDeletion(file.LastWriteTime, staleBefore, activeAfter))
+                    continue;
+
+                list.Add(new ClaudeSessionItem
+                {
+                    FilePath = file.FullName,
+                    SessionId = Path.GetFileNameWithoutExtension(file.Name),
+                    WorkingDirectory = file.Directory?.Name ?? "Desconocido",
+                    LastModified = file.LastWriteTime,
+                    FileSizeBytes = file.Length,
+                    IsStale = true
+                });
+            }
+
+            return list;
+        }, cancellationToken);
+    }
+
     public async Task<ClaudeCleanupResult> DeleteStaleTranscriptsAsync(CancellationToken cancellationToken = default)
     {
         return await Task.Run(() =>
@@ -115,8 +148,7 @@ public class ClaudeMaintenanceService : IClaudeMaintenanceService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 24-hour guard: skip any file modified in the last 24 hours unconditionally
-                if (file.LastWriteTime >= staleBefore || file.LastWriteTime >= activeAfter)
+                if (!IsEligibleForDeletion(file.LastWriteTime, staleBefore, activeAfter))
                 {
                     continue;
                 }
@@ -351,6 +383,13 @@ public class ClaudeMaintenanceService : IClaudeMaintenanceService
             throw;
         }
     }
+
+    /// <summary>
+    /// A transcript is eligible for physical deletion only once it is older than the configured
+    /// retention window AND outside the unconditional 24-hour active-session grace period.
+    /// </summary>
+    private static bool IsEligibleForDeletion(DateTime lastWriteTime, DateTime staleBefore, DateTime activeAfter)
+        => lastWriteTime < staleBefore && lastWriteTime < activeAfter;
 
     private static bool IsClaudeProcessRunning()
     {

@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using ClaudeDesktopTools.Models;
 using ClaudeDesktopTools.Services;
 using Xunit;
 
@@ -69,5 +71,62 @@ public class ClaudeConfigDiscoveryServiceTests : IDisposable
 
         Assert.False(ClaudeConfigDiscoveryService.HasInfrastructureSecret(filePath));
         Assert.True(ClaudeConfigDiscoveryService.IsCandidateAllowed(filePath));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DiscoverAsync_IgnoresReferencesFolderWithoutClaudeMarker()
+    {
+        // A top-level references/ folder with no CLAUDE.md nearby belongs to another
+        // tool (e.g. Gemini), not Claude, and must not be reported as a candidate.
+        string otherToolDir = Path.Combine(_tempDir, "gemini-project");
+        Directory.CreateDirectory(Path.Combine(otherToolDir, "references"));
+        File.WriteAllText(Path.Combine(otherToolDir, "references", "gemini-notes.md"), "# Gemini notes");
+
+        string claudeDir = Path.Combine(_tempDir, "claude-project");
+        Directory.CreateDirectory(Path.Combine(claudeDir, "references"));
+        File.WriteAllText(Path.Combine(claudeDir, "CLAUDE.md"), "# Claude context");
+        File.WriteAllText(Path.Combine(claudeDir, "references", "claude-notes.md"), "# Claude notes");
+
+        var service = new ClaudeConfigDiscoveryService();
+        var report = await service.DiscoverAsync(_tempDir, maxDepth: 3);
+
+        Assert.Contains(report.Candidates, c => c.FilePath.EndsWith("claude-notes.md"));
+        Assert.DoesNotContain(report.Candidates, c => c.FilePath.EndsWith("gemini-notes.md"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DiscoverAsync_FindsSkillsAgentsScheduledTasksAndHooks()
+    {
+        string dotClaudeDir = Path.Combine(_tempDir, ".claude");
+
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "skills", "my-skill"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "skills", "my-skill", "SKILL.md"), "# My Skill");
+
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "agents"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "agents", "my-agent.md"), "# My Agent");
+
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "scheduled-tasks", "my-task"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "scheduled-tasks", "my-task", "SKILL.md"), "# My Task");
+
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "hooks"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "hooks", "my-hook.ps1"), "Write-Host 'hi'");
+        File.WriteAllText(Path.Combine(dotClaudeDir, "hooks", "state.json"), "{}"); // non-script, must be ignored
+
+        var service = new ClaudeConfigDiscoveryService();
+        var report = await service.DiscoverAsync(_tempDir, maxDepth: 3);
+
+        var skill = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.Skill);
+        Assert.Equal("skills/my-skill/SKILL.md", skill.RelativePath);
+
+        var agent = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.Agent);
+        Assert.Equal("agents/my-agent.md", agent.RelativePath);
+
+        var scheduledTask = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.ScheduledTask);
+        Assert.Equal("scheduled-tasks/my-task/SKILL.md", scheduledTask.RelativePath);
+
+        var hook = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.Hook);
+        Assert.Equal("hooks/my-hook.ps1", hook.RelativePath);
+
+        Assert.DoesNotContain(report.Candidates, c => c.FilePath.EndsWith("state.json"));
     }
 }

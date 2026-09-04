@@ -3,6 +3,7 @@ bin/
 obj/
 artifacts/
 releases/
+installer/output/
 *.user
 *.suo
 *.userosscache
