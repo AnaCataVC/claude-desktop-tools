@@ -11,5 +11,8 @@ Welcome to the internal engineering documentation and architectural reference fo
 
 ### 2. Engineering Learnings & Design Decisions
 - [`claude-local-session-and-transcript-maintenance.md`](learning/claude-local-session-and-transcript-maintenance.md): Comprehensive analysis of the 24-hour grace window, in-memory process overwrite prevention (`claude.exe`), and surgical regex header swaps with timestamp preservation.
-- [`unversioned-ai-context-discovery-and-secret-filtering.md`](learning/unversioned-ai-context-discovery-and-secret-filtering.md): Multi-zone BFS context discovery, chunked Git tracking via `git ls-files` (batch size 50), and defense-in-depth regex secret scanning.
+- [`unversioned-ai-context-discovery-and-secret-filtering.md`](learning/unversioned-ai-context-discovery-and-secret-filtering.md): Multi-zone BFS context discovery (skills, agents, hooks, references), chunked Git tracking via `git ls-files` (batch size 50), and defense-in-depth regex secret scanning.
 - [`winui3-contentdialog-concurrency-and-dialog-lock.md`](learning/winui3-contentdialog-concurrency-and-dialog-lock.md): Resolving WinUI 3 `ContentDialog` collision crashes (`0x80000018`) using zero-wait semaphore locks (`SemaphoreSlim(1, 1)`).
+
+### 3. Packaging & Distribution
+- [`installer/ClaudeDesktopTools.iss`](../installer/ClaudeDesktopTools.iss): Modern Inno Setup configuration for producing standalone, multi-language Windows desktop installer packages.
