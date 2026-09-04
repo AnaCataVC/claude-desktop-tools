@@ -1,0 +1,17 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using ClaudeDesktopTools.Models;
+
+namespace ClaudeDesktopTools.Services.Interfaces;
+
+public interface IClaudeMaintenanceService
+{
+    ClaudeMaintenanceSettings Settings { get; }
+    void UpdateSettings(ClaudeMaintenanceSettings settings);
+    Task<ClaudeMaintenanceReport> ScanAsync(CancellationToken cancellationToken = default);
+    Task<ClaudeCleanupResult> DeleteStaleTranscriptsAsync(CancellationToken cancellationToken = default);
+    Task<ClaudeCleanupResult> ArchiveStaleSessionsAsync(CancellationToken cancellationToken = default);
+    Task<List<ClaudeSessionItem>> GetSessionsAsync(CancellationToken cancellationToken = default);
+    bool IsClaudeRunning();
+}

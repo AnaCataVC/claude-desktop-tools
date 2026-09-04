@@ -1,0 +1,26 @@
+## Build and Test
+bin/
+obj/
+artifacts/
+releases/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Visual Studio
+.vs/
+.vscode/
+*.DotSettings.user
+
+## OS and Local settings
+.DS_Store
+Thumbs.db
+LocalSettings*.json
+test_settings.json
+crash.log
+startup_diagnostic.log
+
+## Test outputs
+TestResults/
+coverage/

@@ -1,0 +1,103 @@
+<Page
+    x:Class="ClaudeDesktopTools.Views.DashboardView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="24" MaxWidth="1000" HorizontalAlignment="Left">
+            
+            <!-- Header Section -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="Panel de Mantenimiento y Auditoría" Style="{ThemeResource TitleTextBlockStyle}" />
+                <TextBlock Text="Gestiona el almacenamiento local de Claude CLI y Claude Desktop con guardas de seguridad."
+                           Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- Metrics Cards -->
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Card: CLI Transcripts -->
+                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Transcripts CLI" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.Report.Transcripts.TotalDisplay, Mode=OneWay}"
+                                   Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+                        <TextBlock Text="{x:Bind ViewModel.Report.Transcripts.Summary, Mode=OneWay}"
+                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Card: Desktop Sessions -->
+                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Sesiones Desktop" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.Report.Sessions.TotalDisplay, Mode=OneWay}"
+                                   Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+                        <TextBlock Text="{x:Bind ViewModel.Report.Sessions.Summary, Mode=OneWay}"
+                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Card: Reclaimable Space -->
+                <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Espacio Recuperable" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.Report.TotalReclaimableDisplay, Mode=OneWay}"
+                                   Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Solo la eliminación de transcripts libera espacio"
+                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Quick Action Buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Command="{x:Bind ViewModel.ScanCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72C;" />
+                        <TextBlock Text="Analizar Almacenamiento" />
+                    </StackPanel>
+                </Button>
+
+                <Button Command="{x:Bind ViewModel.ArchiveStaleSessionsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE7B8;" />
+                        <TextBlock Text="Archivar Sesiones Antiguas" />
+                    </StackPanel>
+                </Button>
+
+                <Button Click="DeleteTranscripts_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE74D;" />
+                        <TextBlock Text="Liberar Espacio en Disco" />
+                    </StackPanel>
+                </Button>
+
+                <ProgressRing IsActive="{x:Bind ViewModel.IsScanning, Mode=OneWay}" Width="24" Height="24" Margin="12,0,0,0" />
+            </StackPanel>
+
+            <!-- Status and Guardrail Info -->
+            <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                     Title="Guardas de Seguridad Activas"
+                     Message="Los archivos modificados en las últimas 24 horas están blindados y jamás se eliminan. El archivado de sesiones no altera el cuerpo del transcript ni libera espacio en disco." />
+
+            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium" />
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>
