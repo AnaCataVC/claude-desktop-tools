@@ -107,7 +107,7 @@
                     BorderThickness="1" CornerRadius="8" Padding="20">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Acerca de Claude Desktop Tools" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <TextBlock Text="Versión 1.1.0 · Desarrollado con WinUI 3 y .NET 9" Style="{ThemeResource CaptionTextBlockStyle}" />
+                    <TextBlock Text="Versión 1.2.0 · Desarrollado con WinUI 3 y .NET 9" Style="{ThemeResource CaptionTextBlockStyle}" />
                     <TextBlock Text="Diseñado para proporcionar soberanía sobre los datos generados localmente por modelos de IA y herramientas de desarrollo."
                                Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
