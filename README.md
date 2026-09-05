@@ -66,7 +66,7 @@ claude-desktop-tools/
 
 ### Installation & Local Setup
 #### Option 1: Official Windows Installer (Recommended)
-Download the latest `ClaudeDesktopToolsSetup-1.2.0.exe` from [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) and follow the modern setup wizard.
+Download the latest `ClaudeDesktopToolsSetup-1.3.0.exe` from [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) and follow the modern setup wizard.
 
 #### Option 2: Build and Run from Source
 Prerequisites: Windows 11 (build 22000 or newer) and [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (`9.0.317` or newer).
@@ -107,7 +107,7 @@ Al colaborar intensamente con Claude Code (CLI) y Claude Desktop en múltiples r
 
 ### Instalación y Ejecución Local
 #### Opción 1: Instalador Oficial para Windows (Recomendado)
-Descarga el archivo `ClaudeDesktopToolsSetup-1.2.0.exe` desde [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) y sigue el asistente interactivo.
+Descarga el archivo `ClaudeDesktopToolsSetup-1.3.0.exe` desde [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) y sigue el asistente interactivo.
 
 #### Opción 2: Compilar y Ejecutar desde el Código Fuente
 ```powershell
