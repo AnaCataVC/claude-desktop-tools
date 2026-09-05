@@ -7,6 +7,7 @@ namespace ClaudeDesktopTools.Helpers;
 
 public static class LocalSettingsHelper
 {
+    private static readonly object _fileLock = new();
     private static string? _customPath;
 
     public static string SettingsFilePath
@@ -31,31 +32,37 @@ public static class LocalSettingsHelper
 
     private static Dictionary<string, string> LoadAll()
     {
-        try
+        lock (_fileLock)
         {
-            if (File.Exists(SettingsFilePath))
+            try
             {
-                string json = File.ReadAllText(SettingsFilePath);
-                return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+                if (File.Exists(SettingsFilePath))
+                {
+                    string json = File.ReadAllText(SettingsFilePath);
+                    return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+                }
             }
+            catch { }
+            return new Dictionary<string, string>();
         }
-        catch { }
-        return new Dictionary<string, string>();
     }
 
     private static void SaveAll(Dictionary<string, string> dict)
     {
-        try
+        lock (_fileLock)
         {
-            string? dir = Path.GetDirectoryName(SettingsFilePath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            try
             {
-                Directory.CreateDirectory(dir);
+                string? dir = Path.GetDirectoryName(SettingsFilePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                string json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(SettingsFilePath, json);
             }
-            string json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(SettingsFilePath, json);
+            catch { }
         }
-        catch { }
     }
 
     public static string? Get(string key)
@@ -66,8 +73,11 @@ public static class LocalSettingsHelper
 
     public static void Set(string key, string value)
     {
-        var dict = LoadAll();
-        dict[key] = value;
-        SaveAll(dict);
+        lock (_fileLock)
+        {
+            var dict = LoadAll();
+            dict[key] = value;
+            SaveAll(dict);
+        }
     }
 }

@@ -22,6 +22,11 @@ public partial class App : Application
     {
         InitializeLoggingAndCrashHandlers();
 
+        this.UnhandledException += (sender, e) =>
+        {
+            LogCrash("Application.UnhandledException", e.Exception);
+        };
+
         _host = Host.CreateDefaultBuilder()
             .ConfigureServices((context, services) =>
             {
@@ -29,12 +34,14 @@ public partial class App : Application
                 services.AddSingleton<IClaudeMaintenanceService, ClaudeMaintenanceService>();
                 services.AddSingleton<IClaudeConfigDiscoveryService, ClaudeConfigDiscoveryService>();
                 services.AddSingleton<IDriveSyncService, DriveSyncService>();
+                services.AddSingleton<IProcessMonitorService, ProcessMonitorService>();
 
                 // ViewModels
                 services.AddTransient<DashboardViewModel>();
                 services.AddTransient<SessionsViewModel>();
                 services.AddTransient<ContextDiscoveryViewModel>();
                 services.AddTransient<SettingsViewModel>();
+                services.AddTransient<ProcessMonitorViewModel>();
             })
             .Build();
 
