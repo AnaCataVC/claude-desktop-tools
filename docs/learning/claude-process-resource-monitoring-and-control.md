@@ -82,7 +82,17 @@ Because Claude runs on Google V8 (Electron for Desktop, Node for CLI) with activ
 
 ---
 
-## 7. In-Place Collection Reconciliation & Decoupled Feedback in WinUI 3
+## 7. Filtering Out the Packaged Desktop App, and Labeling Sessions by CWD
+
+`GetProcessesByName("claude")` is case-insensitive and `Process.ProcessName` always normalizes to lowercase, so it also matches the packaged Claude Desktop app (`Claude.exe` under `Program Files\WindowsApps\Claude_*`) and every one of its Electron helper subprocesses (`--type=renderer`, `--type=gpu-process`, `--type=utility ...NodeService`, `crashpad-handler`). Verified live: 12 of 15 name-matches on a real machine were desktop-app plumbing, only 3 were actual CLI sessions. `ProcessMonitorService` now excludes anything whose `Process.MainModule.FileName` sits under `Program Files\WindowsApps\` — the one path prefix shared by the main window process and all its helpers, and never used by a real CLI install (`AppData\Roaming\Claude\claude-code\*` or `.local\bin\claude.exe`).
+
+To tell surviving CLI sessions apart, each row is now labeled by the process' live current working directory instead of the (always identical) process name. Windows exposes no documented API for another process's CWD; the standard technique (same one Sysinternals-style tools use) is `NtQueryInformationProcess(ProcessBasicInformation)` → PEB → `RTL_USER_PROCESS_PARAMETERS.CurrentDirectory` via `ReadProcessMemory`. Both structures are undocumented and only guaranteed for a native x64 target, so `TryReadCurrentDirectory` bails out (returns `false`, row falls back to `"PID {pid}"`) whenever this app or the OS isn't 64-bit, or `IsWow64Process` reports the target isn't native x64 — a loud, safe "no label" rather than a decoded-garbage string.
+
+**Important, empirically confirmed limitation**: this only reflects the real project for a CLI process launched directly from a terminal inside a repo folder. A session spawned by Claude Desktop's Cowork/agent-mode plugin infrastructure (`claude-code\<version>\claude.exe`, carrying `--plugin-dir`/`--resume` flags) does **not** inherit a per-repo CWD — every such session observed shared one identical, unrelated OS-level directory (wherever the Electron host itself happened to start from), regardless of which repo it was actually working in. Verified against 6 live CLI processes: the 4 terminal-launched ones each resolved to a distinct, correct repo path; the 2 Cowork-spawned ones both resolved to the same non-representative folder. For those, the label falls back to being merely "not wrong" (a real but unhelpful shared path) rather than actively misleading -- still distinguishable from each other only by PID.
+
+---
+
+## 8. In-Place Collection Reconciliation & Decoupled Feedback in WinUI 3
 
 Wiping the bound collection via `Processes.Clear()` on every 2-second timer tick causes visual layout thrashing, breaks keyboard/Narrator focus navigation, and risks misdirected clicks if item sorting shifts.
 `ProcessMonitorViewModel` instead uses `SyncProcesses`:

@@ -73,6 +73,10 @@ The foundational business logic was previously decoupled from `work-activity-pan
    - `ProcessMonitorService` lists RAM/CPU for every process matching a target name (`"claude"` by default, injectable for tests) via `Process.GetProcessesByName`, refreshed on a 2-second `DispatcherTimer` in `ProcessMonitorView`. CPU% is derived from the delta of `TotalProcessorTime` between two scans (`ComputeCpuPercent`), keyed by `(int Pid, DateTime StartTime)` to reject cross-process deltas caused by OS PID recycling.
    - `TrimWorkingSet(pid, expectedStartTime)` (`EmptyWorkingSet` via `psapi.dll`) and `SetLowPriority(pid, lowPriority, expectedStartTime)` (`Process.PriorityClass`) both re-resolve the process by pid and re-check its name and `StartTime` before acting, guarding against the same pid-recycling window as invariant #3/#7. Both actions are reversible and lossless, so — unlike every other mutating action in this app — they skip the `ContentDialog` + `_dialogLock` confirmation pattern (invariant #5).
 
+9. **Packaged-App Exclusion and Working-Directory Labeling (added 2026-09-05):**
+   - `"claude"` name-matches both the real CLI and the packaged Claude Desktop app (`Program Files\WindowsApps\Claude_*\app\Claude.exe`), plus every one of its Electron helper subprocesses (`--type=renderer`, `--type=gpu-process`, `--type=utility`, `crashpad-handler`), which share that same install path. `IsUnderPackagedAppsRoot` excludes any matched process whose `Process.MainModule.FileName` sits under that root, restoring the "real CLI sessions only" scope invariant #8 assumes.
+   - `TryReadCurrentDirectory(pid)` labels each surviving row with the process' live working directory, read from its PEB (`NtQueryInformationProcess(ProcessBasicInformation)` -> PEB -> `RTL_USER_PROCESS_PARAMETERS.CurrentDirectory` via `ReadProcessMemory`). Windows exposes no documented API for another process's CWD; the offsets used only hold for a native x64 PEB, so the read bails out (no label, falls back to the pid) on a 32-bit build/OS or `IsWow64Process` mismatch rather than decode garbage. Empirically, this resolves the correct repo folder for a CLI process launched directly from a terminal, but not for one spawned by Claude Desktop's Cowork/agent-mode plugin infrastructure, which does not inherit a per-repo working directory (see `docs/learning/claude-process-resource-monitoring-and-control.md`, section 7).
+
 ---
 
 ## 4. Architectural Alternatives Evaluated
@@ -82,4 +86,4 @@ The foundational business logic was previously decoupled from `work-activity-pan
   - *Cons:* Harder to run unit tests in `net9.0` without WinRT dependencies; tight coupling between UI and file system IO.
 - **Option B (Clean Modular Architecture - Recommended):**
   - `ClaudeDesktopTools` (WinUI 3 App): Unpackaged executable, MainWindow, Views, ViewModels, SystemBackdrop (Mica), Dialogs, Navigation. Includes Core Services and Models.
-  - `ClaudeDesktopTools.Tests` (xUnit): Comprehensive automated test suite (84 tests) verifying the safety invariants above, referencing models and services cleanly.
+  - `ClaudeDesktopTools.Tests` (xUnit): Comprehensive automated test suite (93 tests) verifying the safety invariants above, referencing models and services cleanly.

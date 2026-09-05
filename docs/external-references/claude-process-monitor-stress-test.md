@@ -73,6 +73,8 @@ The Process Resource Monitor introduces live visibility (RAM/CPU%) and two per-p
   - CLI sessions running directly under `node.exe` are completely invisible to `Process.GetProcessesByName("claude")`, producing false negatives.
   - The service performs no path or digital signature validation; an untrusted binary named `claude.exe` in any directory will be displayed and manipulated.
 
+  **Partially mitigated (2026-09-05):** `IsUnderPackagedAppsRoot` now excludes any process whose `MainModule.FileName` sits under `Program Files\WindowsApps\` -- the install path shared by the desktop app's main window process and every one of its Electron helpers. Verified live: this dropped 12 of 15 name-matches (all desktop-app plumbing) on a real machine, so the Electron-renderer half of this threat is closed. Still open: the `node.exe` false-negative and the lack of path/signature validation against an arbitrary untrusted `claude.exe` are unrelated gaps this fix does not address.
+
 ---
 
 ### Vector 5: Testing Fragility & Environment Collisions
