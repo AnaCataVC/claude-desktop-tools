@@ -65,3 +65,22 @@ private async void DeleteTranscripts_Click(object sender, RoutedEventArgs e)
 1. `WaitAsync(0)` evaluates synchronously without putting the UI thread to sleep.
 2. Rapid clicks return immediately, completely neutralizing double-submit race conditions.
 3. The `finally` block guarantees that `_dialogLock.Release()` is executed regardless of user dismissal or unhandled task exceptions.
+
+---
+
+## 3. Extension to SessionsView & Scrollable Previews (`PreviewDialogHelper`)
+
+In `ClaudeDesktopTools.Views.SessionsView`, the exact same pattern is applied to guard:
+- `CloseSession_Click` (terminating live Claude Code CLI processes)
+- `DeleteTranscript_Click` (deleting single session transcripts)
+- `DeleteAllInactive_Click` (bulk deleting all inactive transcripts)
+- `DeleteInactiveOlderThan_Click` (bulk deleting inactive transcripts older than N days)
+
+When performing bulk destructive actions, displaying dozens or hundreds of items directly in a simple text string causes the `ContentDialog` to overflow screen boundaries and clip action buttons.
+
+`PreviewDialogHelper.cs` solves this by constructing a bounded, scrollable content hierarchy:
+- **Introductory Text:** Explains the operation and reiterates the inviolable 24-hour grace guard.
+- **Candidate Preview List:** Caps visible items at `MaxPreviewItems = 20`, displaying each file's working directory and formatted size (`FileSizeDisplay`).
+- **Overflow Summary:** Appends `… y N más.` if candidates exceed the preview ceiling.
+- **ScrollViewer Bounding:** Restricts content height to `MaxHeight = 240` and `MaxWidth = 480` with text wrapping, ensuring primary and close buttons remain always visible and interactable.
+

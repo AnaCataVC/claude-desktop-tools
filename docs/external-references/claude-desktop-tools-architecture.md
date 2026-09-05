@@ -64,6 +64,10 @@ The foundational business logic was previously decoupled from `work-activity-pan
    - BFS traversal bounded by depth and exclusion list (`.git`, `node_modules`, `.claude/projects/**/memory`, `.claude/plans`, `.claude/security`).
    - Batched Git check (`git ls-files` in chunks of 50) and regex secret filters (SSH keys, AWS tokens, GitHub PATs, Slack webhooks).
 
+7. **Sessions View Sources CLI Transcripts, Not the Desktop Index (added 2026-09-04):**
+   - The path listed under item 1 above (`%APPDATA%\Claude\claude-code-sessions`) is the Desktop app's own session index, read only by `ClaudeMaintenanceService.GetSessionsAsync()` for the Dashboard's archiving preview (`DashboardViewModel.GetStaleDesktopSessionsPreviewAsync`). That folder does not exist on a machine where `claude` is only ever run from a terminal.
+   - The Sessions view (`SessionsViewModel`) instead calls a separate method, `GetCliSessionsAsync()`, which lists one entry per top-level transcript directly under `%USERPROFILE%\.claude\projects\<project-folder>\<sessionId>.jsonl` (`Directory.GetFiles(..., SearchOption.TopDirectoryOnly)`, excluding nested `subagents/` transcripts). The two methods intentionally read different stores and are not interchangeable.
+
 ---
 
 ## 4. Architectural Alternatives Evaluated

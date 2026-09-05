@@ -59,6 +59,11 @@ To eliminate process creation overhead while accurately identifying untracked fi
    ```
 4. **Normalized Tracking Check:** Files output by `ls-files` are converted into an in-memory `HashSet<string>` with normalized path separators for instant \(O(1)\) lookups.
 
+### 2.2.1 Orphan Destination Path: Full Relative Path, Not Filename (fixed 2026-09-04)
+Orphan candidates (step 2 above) originally resolved their Drive destination path via `Path.GetFileName(file)` -- just the bare filename. Because every stray `CLAUDE.md` (or `references/*.md`) living outside a Git repository shares the same filename, this collapsed multiple, unrelated files onto the same Drive destination (`_sin-repo/CLAUDE.md`) and each upload silently overwrote the previous one. Only the last-uploaded orphan file ever survived on Drive.
+
+**Fix:** orphan candidates now resolve `RelativePath` via `Path.GetRelativePath(rootPath, file)` -- the full path relative to the scan root -- so `DriveSyncService.BuildDriveRelativePath` recreates the real folder tree under the `_sin-repo/` bucket (e.g. `_sin-repo/some-project/CLAUDE.md` and `_sin-repo/nested/other-project/CLAUDE.md` instead of two collisions on `_sin-repo/CLAUDE.md`). Same technique as `work-activity-panel`'s `ClaudeConfigDiscovery.FindUnversionedAsync`, which already kept the path under the profile root for exactly this reason. Candidates that *do* belong to a Git repository were never affected -- their `RelativePath` is `Path.GetRelativePath(repoRoot, file)`, already unique per repository.
+
 ---
 
 ## 2.3 Defense-in-Depth Secret & Privacy Filter
@@ -69,3 +74,14 @@ Before admitting any file into the discovery list, it must pass a two-layer insp
    - AWS Keys: `(AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}`
    - GitHub PATs: `ghp_[a-zA-Z0-9]{36,255}`, `gho_[a-zA-Z0-9]{36,255}`, `github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}`
    - Slack Tokens: `xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*`
+
+---
+
+## 2.4 Grouping by Category and Per-File Selective Sync
+
+Every `ClaudeDiscoveryCandidate` already carried a `Category` (`ClaudeDiscoveryCategory`: Context/CLAUDE.md, Skill, Agent, ScheduledTask, Hook), but the view only showed it as a badge on an otherwise flat, mixed list, and "Sincronizar a Drive" always sent every discovered candidate -- there was no way to keep CLAUDE.md files separate from skills/agents/hooks, or to exclude specific files from a sync.
+
+- **`CandidateGroup`** (`ClaudeDiscoveryModels.cs`) is an `ObservableCollection<ClaudeDiscoveryCandidate>` tagged with its `Category`. `CandidateGroup.BuildFrom(candidates)` buckets candidates by category and returns one group per non-empty category, in a fixed display order (`ClaudeDiscoveryCategory.DisplayOrder`: Context, Skill, Agent, ScheduledTask, Hook) rather than discovery order.
+- **`ClaudeDiscoveryCandidate.IsSelected`** (defaults `true`, so sync-everything remains the default behavior) is a plain `INotifyPropertyChanged` property -- not a full `ObservableObject` via the MVVM toolkit, since a model only needs to notify its own `CheckBox` binding, not participate in command/property-changed codegen.
+- **`ContextDiscoveryViewModel.GroupedCandidates`** is rebuilt from `Candidates` right after each `DiscoverAsync` scan. `SyncToDriveAsync` filters `Candidates.Where(c => c.IsSelected)` before calling `DriveSyncService.SyncCandidatesAsync` -- an unchecked file is simply never in the list the sync service sees, so no changes were needed on the sync side.
+- The view (`ContextDiscoveryView.xaml`) nests an `ItemsControl` (not a second `ListView` -- WinUI doesn't virtualize nested `ListView`s cleanly) inside each group's `ListView` item, with a per-group header offering "Seleccionar todo" / "Ninguno", plus the same two actions at the top of the page for all groups at once (`ContextDiscoveryViewModel.SelectAllCommand` / `DeselectAllCommand`).
