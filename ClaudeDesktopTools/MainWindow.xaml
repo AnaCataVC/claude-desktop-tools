@@ -17,6 +17,11 @@
                 <NavigationViewItem Content="Dashboard" Tag="Dashboard" Icon="Home" />
                 <NavigationViewItem Content="Sesiones de Claude" Tag="Sessions" Icon="Library" />
                 <NavigationViewItem Content="Contexto IA (CLAUDE.md)" Tag="Context" Icon="Find" />
+                <NavigationViewItem Content="Monitoreo de Recursos" Tag="ProcessMonitor">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9D9;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>

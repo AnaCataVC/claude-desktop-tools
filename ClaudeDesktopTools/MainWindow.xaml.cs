@@ -50,6 +50,9 @@ public sealed partial class MainWindow : Window
                 case "Context":
                     ContentFrame.Navigate(typeof(ContextDiscoveryView));
                     break;
+                case "ProcessMonitor":
+                    ContentFrame.Navigate(typeof(ProcessMonitorView));
+                    break;
                 case "Settings":
                     ContentFrame.Navigate(typeof(SettingsView));
                     break;
