@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using ClaudeDesktopTools.Models;
 using ClaudeDesktopTools.Services;
@@ -165,6 +166,56 @@ public class ProcessMonitorServiceTests : IDisposable
 
         Assert.Equal(0, result);
     }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\WindowsApps\Claude_1.0.0_x64__abc\app\Claude.exe", @"C:\Program Files\WindowsApps\", true)]
+    [InlineData(@"c:\program files\windowsapps\Claude_1.0.0_x64__abc\app\Claude.exe", @"C:\Program Files\WindowsApps\", true)] // case-insensitive
+    [InlineData(@"C:\Users\Username\.local\bin\claude.exe", @"C:\Program Files\WindowsApps\", false)]
+    [InlineData(@"C:\Users\Username\AppData\Roaming\Claude\claude-code\2.1.260\claude.exe", @"C:\Program Files\WindowsApps\", false)]
+    [InlineData(null, @"C:\Program Files\WindowsApps\", false)]
+    public void IsUnderPackagedAppsRoot_OnlyMatchesThePackagedDesktopAppInstallDirectory(string? modulePath, string root, bool expected)
+    {
+        Assert.Equal(expected, ProcessMonitorService.IsUnderPackagedAppsRoot(modulePath, root));
+    }
+
+    [Fact]
+    public void TryReadCurrentDirectory_ReadsTheRealWorkingDirectoryOfARunningProcess()
+    {
+        var expectedDirectory = Path.GetTempPath().TrimEnd('\\');
+        var dummy = Process.Start(new ProcessStartInfo("ping.exe", "-n 60 127.0.0.1")
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            WorkingDirectory = expectedDirectory
+        })!;
+
+        try
+        {
+            bool ok = ProcessMonitorService.TryReadCurrentDirectory(dummy.Id, out var currentDirectory);
+
+            if (!Environment.Is64BitProcess || !Environment.Is64BitOperatingSystem)
+            {
+                // The PEB-reading fast path only supports native x64 -- everywhere else it must refuse, not guess.
+                Assert.False(ok);
+                return;
+            }
+
+            Assert.True(ok);
+            Assert.Equal(expectedDirectory, currentDirectory?.TrimEnd('\\'), ignoreCase: true);
+        }
+        finally
+        {
+            try { dummy.Kill(); } catch { }
+            dummy.Dispose();
+        }
+    }
+
+    [Fact]
+    public void TryReadCurrentDirectory_RefusesAPidThatDoesNotExist()
+    {
+        Assert.False(ProcessMonitorService.TryReadCurrentDirectory(999999, out var currentDirectory));
+        Assert.Null(currentDirectory);
+    }
 }
 
 public class ClaudeProcessInfoTests
@@ -194,6 +245,22 @@ public class ClaudeProcessInfoTests
         var info = new ClaudeProcessInfo { IsLowPriority = isLowPriority };
 
         Assert.Equal(expected, info.PriorityToggleLabel);
+    }
+
+    [Fact]
+    public void SessionLabel_UsesTheWorkingDirectoryFolderNameWhenAvailable()
+    {
+        var info = new ClaudeProcessInfo { Pid = 123, WorkingDirectory = @"C:\Users\Username\Repos\claude-desktop-tools" };
+
+        Assert.Equal("claude-desktop-tools", info.SessionLabel);
+    }
+
+    [Fact]
+    public void SessionLabel_FallsBackToThePidWhenNoWorkingDirectoryWasResolved()
+    {
+        var info = new ClaudeProcessInfo { Pid = 456, WorkingDirectory = null };
+
+        Assert.Equal("PID 456", info.SessionLabel);
     }
 
     [Fact]
