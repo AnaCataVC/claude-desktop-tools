@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
@@ -17,6 +18,22 @@ public sealed class ClaudeProcessInfo : INotifyPropertyChanged
     public int Pid { get; init; }
     public string ProcessName { get; init; } = string.Empty;
     public DateTime StartTime { get; init; }
+
+    /// <summary>Live working directory read from the process' PEB, or null when it couldn't be resolved (32-bit build/OS, bitness mismatch, access denied).</summary>
+    public string? WorkingDirectory { get; init; }
+
+    /// <summary>The repo/session folder name when known, falling back to the pid so every row stays distinguishable.</summary>
+    public string SessionLabel
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(WorkingDirectory)) return $"PID {Pid}";
+            var folderName = Path.GetFileName(WorkingDirectory.TrimEnd('\\', '/'));
+            return string.IsNullOrEmpty(folderName) ? WorkingDirectory : folderName;
+        }
+    }
+
+    public string WorkingDirectoryTooltip => WorkingDirectory ?? "No se pudo determinar la carpeta de trabajo (bitness distinta o acceso denegado).";
 
     public long WorkingSetBytes
     {

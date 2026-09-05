@@ -72,10 +72,11 @@
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,4">
                         <Grid ColumnDefinitions="*, Auto, Auto, Auto, Auto">
-                            <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="{x:Bind ProcessName}" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <TextBlock Text="{x:Bind Pid}" Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel Grid.Column="0" Spacing="4" ToolTipService.ToolTip="{x:Bind WorkingDirectoryTooltip}">
+                                <TextBlock Text="{x:Bind SessionLabel}" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                    <Run Text="{x:Bind ProcessName}" /><Run Text=" · PID " /><Run Text="{x:Bind Pid}" />
+                                </TextBlock>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0" Spacing="2">
