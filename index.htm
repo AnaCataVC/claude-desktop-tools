@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Desktop Tools — Autonomous Storage & Session Workstation Hub for Windows 11</title>
+  <meta name="description" content="Native Windows 11 desktop hub crafted with WinUI 3 and .NET 9 to safely audit, reclaim CLI transcript storage, prune Claude Desktop sessions, scan secrets, and back up AI context.">
+  <meta name="theme-color" content="#0d1117">
+
+  <!-- OpenGraph & Twitter Social Cards -->
+  <meta property="og:title" content="Claude Desktop Tools — Windows 11 Workstation Hub">
+  <meta property="og:description" content="Reclaim gigabytes of Claude Code CLI transcripts and organize session indexes safely with an inviolable 24h grace window and process lock.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script>
+    // Defensive theme initialization: avoid SecurityError under strict file:/// sandboxes
+    (function () {
+      try {
+        const savedTheme = localStorage.getItem('cdt_theme');
+        if (savedTheme) {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {
+        /* Fallback silently to dark theme */
+      }
+    })();
+  </script>
+
+  <style>
+    /* ==========================================================================
+       01. DESIGN TOKENS & RESET (CSS Custom Properties)
+       ========================================================================== */
+    :root {
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", "Segoe UI Mono", Menlo, Consolas, monospace;
+
+      /* Dark Palette (Default) */
+      --bg-base: #0d1117;
+      --bg-surface: #161b22;
+      --bg-surface-elevated: #21262d;
+      --bg-surface-hover: #30363d;
+      --border-subtle: rgba(240, 246, 252, 0.1);
+      --border-default: #30363d;
+      --border-accent: rgba(249, 115, 22, 0.4);
+
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+
+      /* Brand Accents */
+      --coral-500: #f97316;
+      --coral-600: #ea580c;
+      --coral-glow: rgba(249, 115, 22, 0.25);
+      --fluent-blue: #0078d4;
+      --fluent-blue-light: #38bdf8;
+      --fluent-glow: rgba(0, 120, 212, 0.25);
+
+      --success: #3fb950;
+      --success-bg: rgba(63, 185, 80, 0.15);
+      --warning: #d29922;
+      --warning-bg: rgba(210, 153, 34, 0.15);
+      --danger: #f85149;
+      --danger-bg: rgba(248, 81, 73, 0.15);
+
+      /* Mica Glassmorphism */
+      --mica-bg: rgba(22, 27, 34, 0.75);
+      --mica-blur: blur(24px) saturate(180%);
+      --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(255, 255, 255, 0.05) inset;
+      --hero-glow: radial-gradient(circle at 50% 10%, rgba(249, 115, 22, 0.18) 0%, rgba(0, 120, 212, 0.12) 35%, transparent 70%);
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+
+      --transition-fast: 0.18s ease;
+      --transition-normal: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-base: #f6f8fa;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f0f2f5;
+      --bg-surface-hover: #e4e7eb;
+      --border-subtle: rgba(31, 35, 40, 0.1);
+      --border-default: #d0d7de;
+      --border-accent: rgba(234, 88, 12, 0.5);
+
+      --coral-500: #c2410c;
+      --coral-600: #9a3412;
+      --coral-glow: rgba(194, 65, 12, 0.15);
+
+      --text-primary: #1f2328;
+      --text-secondary: #57606a;
+      --text-muted: #8c959f;
+
+      --fluent-glow: rgba(0, 120, 212, 0.15);
+      --mica-bg: rgba(255, 255, 255, 0.85);
+      --card-shadow: 0 8px 24px rgba(140, 149, 159, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);
+      --hero-glow: radial-gradient(circle at 50% 10%, rgba(249, 115, 22, 0.12) 0%, rgba(0, 120, 212, 0.08) 35%, transparent 70%);
+    }
+
+    /* Box sizing & baseline */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+      transition: background-color var(--transition-normal), color var(--transition-normal);
+      background-image: var(--hero-glow);
+      background-repeat: no-repeat;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    /* ==========================================================================
+       02. UTILITIES & CONTAINER
+       ========================================================================== */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: var(--radius-full);
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .badge-coral {
+      background: rgba(249, 115, 22, 0.12);
+      border-color: rgba(249, 115, 22, 0.35);
+      color: var(--coral-500);
+    }
+
+    .badge-green {
+      background: var(--success-bg);
+      border-color: rgba(63, 185, 80, 0.4);
+      color: var(--success);
+    }
+
+    .badge-blue {
+      background: rgba(0, 120, 212, 0.12);
+      border-color: rgba(0, 120, 212, 0.35);
+      color: var(--fluent-blue-light);
+    }
+
+    .section-header {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 3rem auto;
+    }
+
+    .section-eyebrow {
+      display: inline-block;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--coral-500);
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: 2.3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+
+    .section-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ==========================================================================
+       03. STICKY HEADER & NAVBAR
+       ========================================================================== */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: var(--mica-blur);
+      background-color: var(--mica-bg);
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background-color var(--transition-normal), border-color var(--transition-normal);
+    }
+
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 70px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--coral-500), var(--fluent-blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 12px var(--coral-glow);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .nav-link {
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: color var(--transition-fast);
+      padding: 0.5rem 0.25rem;
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      transition: all var(--transition-fast);
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-accent);
+      transform: translateY(-1px);
+    }
+
+    .lang-switcher {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0 0.65rem;
+      height: 38px;
+      border-radius: var(--radius-md);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      transition: all var(--transition-fast);
+    }
+
+    .lang-switcher:hover {
+      border-color: var(--border-accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      font-weight: 600;
+      font-size: 0.92rem;
+      padding: 0.65rem 1.25rem;
+      border-radius: var(--radius-md);
+      transition: all var(--transition-normal);
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--coral-500), var(--coral-600));
+      color: #ffffff;
+      box-shadow: 0 4px 16px var(--coral-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #fb923c, var(--coral-500));
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-default);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+    }
+
+    .btn-sm {
+      padding: 0.45rem 0.9rem;
+      font-size: 0.85rem;
+    }
+
+    /* ==========================================================================
+       04. HERO SECTION
+       ========================================================================== */
+    .hero {
+      padding: 4.5rem 0 3.5rem 0;
+      text-align: center;
+    }
+
+    .hero-eyebrow-wrapper {
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      font-weight: 850;
+      letter-spacing: -0.04em;
+      line-height: 1.15;
+      max-width: 960px;
+      margin: 0 auto 1.5rem auto;
+    }
+
+    .hero-title-gradient {
+      background: linear-gradient(120deg, var(--coral-500) 0%, var(--fluent-blue-light) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      max-width: 780px;
+      margin: 0 auto 2.5rem auto;
+      line-height: 1.6;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 2.5rem;
+    }
+
+    .quick-cli-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--text-primary);
+      box-shadow: var(--card-shadow);
+    }
+
+    .quick-cli-prompt {
+      color: var(--coral-500);
+      user-select: none;
+    }
+
+    .copy-btn {
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all var(--transition-fast);
+    }
+
+    .copy-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--coral-500);
+    }
+
+
+
+    /* ==========================================================================
+       06. INTERACTIVE CALCULATOR
+       ========================================================================== */
+    .calculator-section {
+      padding: 5rem 0;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .calc-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      box-shadow: var(--card-shadow);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    .calc-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .calc-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .calc-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .calc-val-badge {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      color: var(--coral-500);
+      font-weight: 700;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--bg-surface-hover);
+      outline: none;
+      transition: background 0.2s;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--coral-500);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--coral-glow);
+      transition: transform 0.15s;
+    }
+
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .calc-results {
+      background: var(--bg-base);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      box-shadow: 0 10px 30px var(--coral-glow);
+    }
+
+    .result-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 1rem;
+    }
+
+    .result-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .result-label {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+    }
+
+    .result-value {
+      font-size: 1.8rem;
+      font-weight: 850;
+      color: var(--coral-500);
+      letter-spacing: -0.02em;
+    }
+
+    /* ==========================================================================
+       07. SAFETY INVARIANTS GRID
+       ========================================================================== */
+    .safety-section {
+      padding: 5rem 0;
+    }
+
+    .invariants-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .invariant-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: 1.8rem;
+      transition: all var(--transition-normal);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .invariant-card:hover {
+      border-color: var(--coral-500);
+      transform: translateY(-4px);
+      box-shadow: var(--card-shadow);
+    }
+
+    .inv-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .inv-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--coral-500);
+      flex-shrink: 0;
+    }
+
+    .inv-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.25rem;
+    }
+
+    .inv-desc {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      margin-bottom: 1.25rem;
+    }
+
+    .inv-code {
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--fluent-blue-light);
+      word-break: break-all;
+    }
+
+    /* ==========================================================================
+       08. TERMINAL HUB & FAQ
+       ========================================================================== */
+    .terminal-section {
+      padding: 5rem 0;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .term-box {
+      background: #090d12;
+      border: 1px solid #30363d;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      max-width: 820px;
+      margin: 0 auto;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .term-header {
+      background: #161b22;
+      padding: 0.65rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #30363d;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #8b949e;
+    }
+
+    .term-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .term-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .term-body {
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.8;
+      color: #c9d1d9;
+    }
+
+    .term-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+
+    .term-cmd {
+      color: #f0f6fc;
+    }
+
+    .term-comment {
+      color: #8b949e;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    /* FAQ Accordion */
+    .faq-section {
+      padding: 5rem 0;
+    }
+
+    .faq-accordion {
+      max-width: 820px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .faq-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      transition: border-color var(--transition-fast);
+    }
+
+    .faq-item:hover {
+      border-color: var(--border-accent);
+    }
+
+    .faq-trigger {
+      width: 100%;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .faq-arrow {
+      transition: transform var(--transition-normal);
+      color: var(--coral-500);
+      flex-shrink: 0;
+    }
+
+    .faq-item.open .faq-arrow {
+      transform: rotate(180deg);
+    }
+
+    .faq-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
+      background: var(--bg-surface-elevated);
+    }
+
+    .faq-item.open .faq-content {
+      max-height: 400px;
+      transition: max-height 0.3s cubic-bezier(0.5, 0, 1, 0);
+    }
+
+    .faq-body {
+      padding: 1.25rem 1.5rem;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    /* ==========================================================================
+       09. FOOTER & TOAST
+       ========================================================================== */
+    .site-footer {
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      padding: 3rem 0;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+
+    .footer-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--coral-500);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--coral-500);
+      box-shadow: 0 10px 30px var(--coral-glow);
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-md);
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       10. RESPONSIVE BREAKPOINTS
+       ========================================================================== */
+    @media (max-width: 992px) {
+      .hero-title { font-size: 2.8rem; }
+      .calc-card { grid-template-columns: 1fr; gap: 2rem; }
+    }
+
+    @media (max-width: 768px) {
+      .navbar { height: 60px; }
+      .nav-links { display: none; }
+      .hero-title { font-size: 2.2rem; }
+      .hero-subtitle { font-size: 1.05rem; }
+      .section-title { font-size: 1.8rem; }
+      .calc-card { padding: 1.5rem; }
+      .footer-content { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       STICKY HEADER & NAVBAR
+       ========================================================================== -->
+  <header class="site-header" role="banner">
+    <div class="container navbar">
+      <a href="#" class="brand" aria-label="Claude Desktop Tools Home">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <span>Claude Desktop Tools</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a href="#calculator" class="nav-link" data-i18n="nav_calculator">Calculator</a>
+        <a href="#safety" class="nav-link" data-i18n="nav_safety">Safety Invariants</a>
+        <a href="#terminal" class="nav-link" data-i18n="nav_terminal">Terminal</a>
+        <a href="#faq" class="nav-link" data-i18n="nav_faq">FAQ</a>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Language Switcher -->
+        <button class="lang-switcher" id="langToggle" aria-label="Switch language">
+          <span id="langLabel">ES</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle Light and Dark Mode">
+          <svg id="themeIconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <!-- Direct Download Button -->
+        <a href="https://github.com/AnaCataVC/claude-desktop-tools/releases/download/v1.1.0/ClaudeDesktopToolsSetup-1.1.0.exe" class="btn btn-primary btn-sm" download>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span data-i18n="btn_download_setup">Download Setup</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       HERO SECTION
+       ========================================================================== -->
+  <main id="main-content">
+    <section class="hero">
+      <div class="container">
+        <div class="hero-eyebrow-wrapper">
+          <span class="badge badge-coral">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span data-i18n="hero_badge">v1.1.0 · Windows 11 Native · WinUI 3 · .NET 9</span>
+          </span>
+        </div>
+
+        <h1 class="hero-title">
+          <span data-i18n="hero_title_1">Autonomous Command Center for</span><br>
+          <span class="hero-title-gradient" data-i18n="hero_title_2">Claude Code CLI & Claude Desktop</span>
+        </h1>
+
+        <p class="hero-subtitle" data-i18n="hero_subtitle">
+          Reclaim gigabytes of uncompressed transcript storage and declutter hundreds of orphaned sessions safely. Engineered with an inviolable 24-hour active session grace window, process collision guards, and live secret scanning.
+        </p>
+
+        <div class="hero-cta-group">
+          <a href="https://github.com/AnaCataVC/claude-desktop-tools/releases/download/v1.1.0/ClaudeDesktopToolsSetup-1.1.0.exe" class="btn btn-primary" download>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span data-i18n="hero_cta_download">Download Installer (.EXE)</span>
+          </a>
+
+          <a href="https://github.com/AnaCataVC/claude-desktop-tools" class="btn btn-secondary" target="_blank" rel="noopener">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            <span data-i18n="hero_cta_github">GitHub Repository</span>
+          </a>
+        </div>
+
+        <div class="quick-cli-box">
+          <span class="quick-cli-prompt">$</span>
+          <code>winget install AnaCataVC.ClaudeDesktopTools</code>
+          <button class="copy-btn" onclick="copySnippet('winget install AnaCataVC.ClaudeDesktopTools')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span data-i18n="btn_copy">Copy</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+
+    <!-- ==========================================================================
+         INTERACTIVE SAVINGS CALCULATOR
+         ========================================================================== -->
+    <section id="calculator" class="calculator-section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow" data-i18n="calc_eyebrow">Workstation ROI Calculator</span>
+          <h2 class="section-title" data-i18n="calc_title">Estimate Your Annual Storage & Session Savings</h2>
+          <p class="section-subtitle" data-i18n="calc_subtitle">
+            Claude Code CLI saves full prompt and response JSON trees. See how much disk space and UI clutter accumulates over time.
+          </p>
+        </div>
+
+        <div class="calc-card">
+          <div class="calc-inputs">
+            <!-- Slider 1 -->
+            <div class="calc-group">
+              <div class="calc-label-row">
+                <span data-i18n="calc_slider1_label">Weekly Claude Code CLI Prompts:</span>
+                <span id="promptCountVal" class="calc-val-badge">120 prompts/wk</span>
+              </div>
+              <input type="range" id="promptCount" class="slider" min="10" max="500" value="120" step="10" aria-label="Weekly prompts">
+            </div>
+
+            <!-- Slider 2 -->
+            <div class="calc-group">
+              <div class="calc-label-row">
+                <span data-i18n="calc_slider2_label">Active Repositories / Projects:</span>
+                <span id="repoCountVal" class="calc-val-badge">8 repositories</span>
+              </div>
+              <input type="range" id="repoCount" class="slider" min="1" max="40" value="8" step="1" aria-label="Active repositories">
+            </div>
+
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;" data-i18n="calc_disclaimer">
+              *Calculations based on average uncompressed JSONL transcript weight of ~1.2 MB per multi-turn exchange and average Claude Desktop session clutter rates.
+            </p>
+          </div>
+
+          <div class="calc-results">
+            <div class="result-row">
+              <div class="result-label" data-i18n="calc_res_disk">Annual Disk Space Reclaimed:</div>
+              <div id="reclaimedDiskVal" class="result-value">7.5 GB</div>
+            </div>
+
+            <div class="result-row">
+              <div class="result-label" data-i18n="calc_res_sessions">Orphaned Sessions Organized:</div>
+              <div id="organizedSessionsVal" class="result-value">384</div>
+            </div>
+
+            <div class="result-row">
+              <div class="result-label" data-i18n="calc_res_time">Estimated Context Discovery Time Saved:</div>
+              <div id="timeSavedVal" class="result-value">18.2 hrs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         THE 6 INVIOLABLE SAFETY INVARIANTS
+         ========================================================================== -->
+    <section id="safety" class="safety-section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow" data-i18n="safety_eyebrow">Enterprise Reliability</span>
+          <h2 class="section-title" data-i18n="safety_title">The 6 Inviolable Safety Guardrails</h2>
+          <p class="section-subtitle" data-i18n="safety_subtitle">
+            Engineered specifically to prevent data loss, process race conditions, and corrupted workstation state.
+          </p>
+        </div>
+
+        <div class="invariants-grid">
+          <!-- Card 1 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv1_title">24-Hour Active Grace Window</h3>
+                  <span class="badge badge-green" data-i18n="inv1_tag">Never Deleted</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv1_desc">
+                Any transcript touched within the past 24 hours is unconditionally shielded. Your in-progress and recently resumed CLI sessions are 100% safe, even if retention is configured to 0 days.
+              </p>
+            </div>
+            <div class="inv-code">ActiveSessionGrace = TimeSpan.FromHours(24)</div>
+          </article>
+
+          <!-- Card 2 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv2_title">Process Collision Lock</h3>
+                  <span class="badge badge-coral" data-i18n="inv2_tag">claude.exe Probe</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv2_desc">
+                Detects if Claude Desktop is running in memory. Refuses session archiving to prevent in-memory changes from being silently overwritten when Claude exits and flushes to disk.
+              </p>
+            </div>
+            <div class="inv-code">Process.GetProcessesByName("claude").Length &gt; 0</div>
+          </article>
+
+          <!-- Card 3 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv3_title">Surgical Header Mutation</h3>
+                  <span class="badge badge-blue" data-i18n="inv3_tag">Zero Rewrites</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv3_desc">
+                Inspects only the first 1,000 characters. Flips "isArchived": false to true via a sibling .tmp file, preserving LastWriteTime and avoiding full multi-megabyte JSON deserialization.
+              </p>
+            </div>
+            <div class="inv-code">File.Move(tmpPath, target, overwrite: true)</div>
+          </article>
+
+          <!-- Card 4 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv4_title">Secret Scanning & BFS</h3>
+                  <span class="badge badge-coral" data-i18n="inv4_tag">Shielded IO</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv4_desc">
+                Bounded breadth-first search scans CLAUDE.md, skills, and agents. Real-time regex inspection shields SSH private keys, AWS tokens, GitHub PATs, and Slack webhooks before upload.
+              </p>
+            </div>
+            <div class="inv-code">Regex: AKIA[0-9A-Z]{16} | ghp_[0-9a-zA-Z]{36}</div>
+          </article>
+
+          <!-- Card 5 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv5_title">Modal Concurrency Lock</h3>
+                  <span class="badge badge-green" data-i18n="inv5_tag">Crash Prevention</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv5_desc">
+                All destructive user dialogs are guarded by SemaphoreSlim(1, 1). Prevents WinUI 3 concurrent dialog collision crashes (COM exception 0x80004005) during rapid UI interaction.
+              </p>
+            </div>
+            <div class="inv-code">await _dialogLock.WaitAsync(0);</div>
+          </article>
+
+          <!-- Card 6 -->
+          <article class="invariant-card">
+            <div>
+              <div class="inv-header">
+                <div class="inv-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="inv-title" data-i18n="inv6_title">Dynamic Safe Path Resolution</h3>
+                  <span class="badge badge-blue" data-i18n="inv6_tag">Zero Hardcoding</span>
+                </div>
+              </div>
+              <p class="inv-desc" data-i18n="inv6_desc">
+                Paths resolved dynamically using Environment.SpecialFolder.UserProfile and ApplicationData. Zero hardcoded paths, guaranteed portability across Windows 11 systems.
+              </p>
+            </div>
+            <div class="inv-code">SpecialFolder.UserProfile & ApplicationData</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         TERMINAL HUB & SOURCE BUILD
+         ========================================================================== -->
+    <section id="terminal" class="terminal-section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow" data-i18n="term_eyebrow">Developer Quick Start</span>
+          <h2 class="section-title" data-i18n="term_title">Build & Run from Source in 60 Seconds</h2>
+          <p class="section-subtitle" data-i18n="term_subtitle">
+            Pure .NET 9 with 34 passing xUnit unit tests. No complicated local runtime dependencies.
+          </p>
+        </div>
+
+        <div class="term-box">
+          <div class="term-header">
+            <div class="term-dots">
+              <span class="term-dot win-btn-close"></span>
+              <span class="term-dot win-btn-min"></span>
+              <span class="term-dot win-btn-max"></span>
+            </div>
+            <span>PowerShell 7.4 (x64)</span>
+          </div>
+
+          <div class="term-body">
+            <div class="term-comment"># 1. Clone repository from GitHub</div>
+            <div class="term-line">
+              <span class="term-cmd">git clone https://github.com/AnaCataVC/claude-desktop-tools.git</span>
+              <button class="copy-btn" onclick="copySnippet('git clone https://github.com/AnaCataVC/claude-desktop-tools.git')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span data-i18n="btn_copy">Copy</span>
+              </button>
+            </div>
+
+            <div class="term-comment"># 2. Navigate and build solution with .NET 9 SDK</div>
+            <div class="term-line">
+              <span class="term-cmd">dotnet build ClaudeDesktopTools.sln -p:Platform=x64</span>
+              <button class="copy-btn" onclick="copySnippet('dotnet build ClaudeDesktopTools.sln -p:Platform=x64')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span data-i18n="btn_copy">Copy</span>
+              </button>
+            </div>
+
+            <div class="term-comment"># 3. Run automated test suite (34 tests passing)</div>
+            <div class="term-line">
+              <span class="term-cmd">dotnet test ClaudeDesktopTools.sln</span>
+              <button class="copy-btn" onclick="copySnippet('dotnet test ClaudeDesktopTools.sln')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span data-i18n="btn_copy">Copy</span>
+              </button>
+            </div>
+
+            <div class="term-comment"># 4. Launch the application</div>
+            <div class="term-line">
+              <span class="term-cmd">dotnet run --project ClaudeDesktopTools\ClaudeDesktopTools.csproj</span>
+              <button class="copy-btn" onclick="copySnippet('dotnet run --project ClaudeDesktopTools\\ClaudeDesktopTools.csproj')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span data-i18n="btn_copy">Copy</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         COLLAPSIBLE TECHNICAL FAQ
+         ========================================================================== -->
+    <section id="faq" class="faq-section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-eyebrow" data-i18n="faq_eyebrow">Frequently Asked Questions</span>
+          <h2 class="section-title" data-i18n="faq_title">Technical Clarifications & Details</h2>
+          <p class="section-subtitle" data-i18n="faq_subtitle">
+            Direct answers to common questions about Claude storage behavior and safety guarantees.
+          </p>
+        </div>
+
+        <div class="faq-accordion">
+          <!-- Item 1 -->
+          <div class="faq-item">
+            <button class="faq-trigger" aria-expanded="false" onclick="toggleFaq(this)">
+              <span data-i18n="faq_q1">Does deleting transcripts break active Claude Code sessions?</span>
+              <svg class="faq-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-content">
+              <div class="faq-body" data-i18n="faq_a1">
+                No. The tool enforces an inviolable 24-hour grace window (`ActiveSessionGrace = TimeSpan.FromHours(24)`). Any transcript created or modified within the last 24 hours is unconditionally skipped during pruning, even if you set retention to 0 days. Active CLI conversations are never interrupted.
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="faq-item">
+            <button class="faq-trigger" aria-expanded="false" onclick="toggleFaq(this)">
+              <span data-i18n="faq_q2">Why does session archiving refuse to run while Claude Desktop is open?</span>
+              <svg class="faq-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-content">
+              <div class="faq-body" data-i18n="faq_a2">
+                Claude Desktop maintains its session state in memory. When the application closes, it flushes its cached state to disk, which would overwrite any changes made while running. To prevent this silent overwrite, Claude Desktop Tools probes for `claude.exe` and safely aborts session mutation until Claude is closed.
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="faq-item">
+            <button class="faq-trigger" aria-expanded="false" onclick="toggleFaq(this)">
+              <span data-i18n="faq_q3">Does archiving Claude Desktop sessions delete session files?</span>
+              <svg class="faq-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-content">
+              <div class="faq-body" data-i18n="faq_a3">
+                No. Session archiving mutates the session header flag (`"isArchived": true`) so that old sessions disappear from your Claude Desktop active sidebar. The session files remain intact in `%APPDATA%\Claude\claude-code-sessions`. Only CLI transcripts in `.claude\projects` are physically deleted when cleaning storage.
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="faq-item">
+            <button class="faq-trigger" aria-expanded="false" onclick="toggleFaq(this)">
+              <span data-i18n="faq_q4">What secrets are scanned and shielded during context discovery?</span>
+              <svg class="faq-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-content">
+              <div class="faq-body" data-i18n="faq_a4">
+                The scanner inspects the first 64KB of context files (`CLAUDE.md`, skills, hooks) using compiled regexes for SSH private keys, AWS Access Keys (`AKIA...`), GitHub Personal Access Tokens (`ghp_...`), and Slack webhook URLs. Any file matching these signatures is shielded and excluded from cloud synchronization.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==========================================================================
+       SITE FOOTER
+       ========================================================================== -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container footer-content">
+      <div>
+        <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Claude Desktop Tools</div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);" data-i18n="footer_credits">
+          Open Source MIT License · Crafted with WinUI 3 & .NET 9 for Windows 11
+        </p>
+      </div>
+
+      <ul class="footer-links">
+        <li><a href="https://github.com/AnaCataVC/claude-desktop-tools" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/AnaCataVC/claude-desktop-tools/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/AnaCataVC/claude-desktop-tools/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
+        <li><a href="#main-content" data-i18n="footer_back_top">Back to Top ↑</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span id="toastMsg">Command copied to clipboard!</span>
+  </div>
+
+  <!-- ==========================================================================
+       VANILLA JAVASCRIPT ENGINE
+       ========================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* ==========================================
+         Bilingual Translation Dictionary
+         ========================================== */
+      const translations = {
+        en: {
+          nav_calculator: "Calculator",
+          nav_safety: "Safety Invariants",
+          nav_terminal: "Terminal",
+          nav_faq: "FAQ",
+          btn_download_setup: "Download Setup",
+          btn_copy: "Copy",
+          hero_badge: "v1.1.0 · Windows 11 Native · WinUI 3 · .NET 9",
+          hero_title_1: "Autonomous Command Center for",
+          hero_title_2: "Claude Code CLI & Claude Desktop",
+          hero_subtitle: "Reclaim gigabytes of uncompressed transcript storage and declutter hundreds of orphaned sessions safely. Engineered with an inviolable 24-hour active session grace window, process collision guards, and live secret scanning.",
+          hero_cta_download: "Download Installer (.EXE)",
+          hero_cta_github: "GitHub Repository",
+          calc_eyebrow: "Workstation ROI Calculator",
+          calc_title: "Estimate Your Annual Storage & Session Savings",
+          calc_subtitle: "Claude Code CLI saves full prompt and response JSON trees. See how much disk space and UI clutter accumulates over time.",
+          calc_slider1_label: "Weekly Claude Code CLI Prompts:",
+          calc_slider2_label: "Active Repositories / Projects:",
+          calc_disclaimer: "*Calculations based on average uncompressed JSONL transcript weight of ~1.2 MB per multi-turn exchange and average Claude Desktop session clutter rates.",
+          calc_res_disk: "Annual Disk Space Reclaimed:",
+          calc_res_sessions: "Orphaned Sessions Organized:",
+          calc_res_time: "Estimated Context Discovery Time Saved:",
+          safety_eyebrow: "Enterprise Reliability",
+          safety_title: "The 6 Inviolable Safety Guardrails",
+          safety_subtitle: "Engineered specifically to prevent data loss, process race conditions, and corrupted workstation state.",
+          inv1_title: "24-Hour Active Grace Window",
+          inv1_tag: "Never Deleted",
+          inv1_desc: "Any transcript touched within the past 24 hours is unconditionally shielded. Your in-progress and recently resumed CLI sessions are 100% safe, even if retention is configured to 0 days.",
+          inv2_title: "Process Collision Lock",
+          inv2_tag: "claude.exe Probe",
+          inv2_desc: "Detects if Claude Desktop is running in memory. Refuses session archiving to prevent in-memory changes from being silently overwritten when Claude exits and flushes to disk.",
+          inv3_title: "Surgical Header Mutation",
+          inv3_tag: "Zero Rewrites",
+          inv3_desc: "Inspects only the first 1,000 characters. Flips \"isArchived\": false to true via a sibling .tmp file, preserving LastWriteTime and avoiding full multi-megabyte JSON deserialization.",
+          inv4_title: "Secret Scanning & BFS",
+          inv4_tag: "Shielded IO",
+          inv4_desc: "Bounded breadth-first search scans CLAUDE.md, skills, and agents. Real-time regex inspection shields SSH private keys, AWS tokens, GitHub PATs, and Slack webhooks before upload.",
+          inv5_title: "Modal Concurrency Lock",
+          inv5_tag: "Crash Prevention",
+          inv5_desc: "All destructive user dialogs are guarded by SemaphoreSlim(1, 1). Prevents WinUI 3 concurrent dialog collision crashes (COM exception 0x80004005) during rapid UI interaction.",
+          inv6_title: "Dynamic Safe Path Resolution",
+          inv6_tag: "Zero Hardcoding",
+          inv6_desc: "Paths resolved dynamically using Environment.SpecialFolder.UserProfile and ApplicationData. Zero hardcoded paths, guaranteed portability across Windows 11 systems.",
+          term_eyebrow: "Developer Quick Start",
+          term_title: "Build & Run from Source in 60 Seconds",
+          term_subtitle: "Pure .NET 9 with 34 passing xUnit unit tests. No complicated local runtime dependencies.",
+          faq_eyebrow: "Frequently Asked Questions",
+          faq_title: "Technical Clarifications & Details",
+          faq_subtitle: "Direct answers to common questions about Claude storage behavior and safety guarantees.",
+          faq_q1: "Does deleting transcripts break active Claude Code sessions?",
+          faq_a1: "No. The tool enforces an inviolable 24-hour grace window (ActiveSessionGrace = TimeSpan.FromHours(24)). Any transcript created or modified within the last 24 hours is unconditionally skipped during pruning, even if you set retention to 0 days. Active CLI conversations are never interrupted.",
+          faq_q2: "Why does session archiving refuse to run while Claude Desktop is open?",
+          faq_a2: "Claude Desktop maintains its session state in memory. When the application closes, it flushes its cached state to disk, which would overwrite any changes made while running. To prevent this silent overwrite, Claude Desktop Tools probes for claude.exe and safely aborts session mutation until Claude is closed.",
+          faq_q3: "Does archiving Claude Desktop sessions delete session files?",
+          faq_a3: "No. Session archiving mutates the session header flag (\"isArchived\": true) so that old sessions disappear from your Claude Desktop active sidebar. The session files remain intact in %APPDATA%\\Claude\\claude-code-sessions. Only CLI transcripts in .claude\\projects are physically deleted when cleaning storage.",
+          faq_q4: "What secrets are scanned and shielded during context discovery?",
+          faq_a4: "The scanner inspects the first 64KB of context files (CLAUDE.md, skills, hooks) using compiled regexes for SSH private keys, AWS Access Keys (AKIA...), GitHub Personal Access Tokens (ghp_...), and Slack webhook URLs. Any file matching these signatures is shielded and excluded from cloud synchronization.",
+          footer_credits: "Open Source MIT License · Crafted with WinUI 3 & .NET 9 for Windows 11",
+          footer_back_top: "Back to Top ↑"
+        },
+        es: {
+          nav_calculator: "Calculadora",
+          nav_safety: "Invariantes de Seguridad",
+          nav_terminal: "Terminal",
+          nav_faq: "Preguntas Frecuentes",
+          btn_download_setup: "Descargar Setup",
+          btn_copy: "Copiar",
+          hero_badge: "v1.1.0 · Windows 11 Nativo · WinUI 3 · .NET 9",
+          hero_title_1: "Centro de Comando Autónomo para",
+          hero_title_2: "Claude Code CLI y Claude Desktop",
+          hero_subtitle: "Recupera gigabytes de almacenamiento en transcripts y ordena cientos de sesiones huérfanas de forma segura. Diseñado con una guarda inviolable de 24 horas, bloqueo por proceso activo y filtro de secretos en vivo.",
+          hero_cta_download: "Descargar Instalador (.EXE)",
+          hero_cta_github: "Repositorio en GitHub",
+          calc_eyebrow: "Calculadora de Ahorro",
+          calc_title: "Calcula tu Ahorro Anual de Disco y Sesiones",
+          calc_subtitle: "Claude Code CLI guarda el árbol completo de prompts y respuestas en JSON. Comprueba cuánto espacio y desorden se acumula.",
+          calc_slider1_label: "Prompts Semanales en Claude Code CLI:",
+          calc_slider2_label: "Repositorios / Proyectos Activos:",
+          calc_disclaimer: "*Cálculos basados en un peso promedio de ~1.2 MB por transcript JSONL y tasas habituales de acumulación de sesiones en Claude Desktop.",
+          calc_res_disk: "Espacio en Disco Recuperado al Año:",
+          calc_res_sessions: "Sesiones Huérfanas Organizadas:",
+          calc_res_time: "Horas Estimadas de Búsqueda Ahorradas:",
+          safety_eyebrow: "Confiabilidad de Nivel Empresarial",
+          safety_title: "Las 6 Guardas de Seguridad Inviolables",
+          safety_subtitle: "Diseñadas rigurosamente para prevenir pérdida de datos, colisiones entre procesos y estados corruptos en disco.",
+          inv1_title: "Guarda Inviolable de 24 Horas",
+          inv1_tag: "Jamás se Elimina",
+          inv1_desc: "Cualquier transcript modificado en las últimas 24 horas está blindado incondicionalmente. Tus sesiones CLI activas o recién retomadas están 100% a salvo, incluso con retención en 0 días.",
+          inv2_title: "Bloqueo por Proceso Activo",
+          inv2_tag: "Sondeo claude.exe",
+          inv2_desc: "Detecta si Claude Desktop está en ejecución. Rechaza el archivado para evitar que la memoria de Claude sobrescriba silenciosamente el archivo de sesiones al cerrarse.",
+          inv3_title: "Mutación Quirúrgica de Headers",
+          inv3_tag: "Sin Reescribir Todo",
+          inv3_desc: "Examina solo los primeros 1.000 caracteres. Cambia \"isArchived\": false a true mediante un archivo temporal .tmp hermano, preservando LastWriteTime sin deserializar gigabytes.",
+          inv4_title: "Filtro de Secretos y BFS",
+          inv4_tag: "E/S Blindada",
+          inv4_desc: "Exploración BFS acotada en CLAUDE.md, skills y agentes. Análisis regex en tiempo real que protege claves privadas SSH, AWS, GitHub PATs y tokens antes de sincronizar.",
+          inv5_title: "Bloqueo Modal de Concurrencia",
+          inv5_tag: "Anti-Cuelgues",
+          inv5_desc: "Los diálogos de eliminación están protegidos por SemaphoreSlim(1, 1). Previene colisiones y fallos COM (0x80004005) en WinUI 3 ante clics consecutivos rápidos.",
+          inv6_title: "Rutas Dinámicas Seguras",
+          inv6_tag: "Cero Rutas Fijas",
+          inv6_desc: "Rutas resueltas en tiempo de ejecución con Environment.SpecialFolder.UserProfile y ApplicationData. Cero rutas absolutas fijas, máxima portabilidad en Windows 11.",
+          term_eyebrow: "Inicio Rápido para Desarrolladores",
+          term_title: "Compila y Ejecuta desde Código Fuente en 60s",
+          term_subtitle: ".NET 9 puro con 34 pruebas unitarias xUnit pasando. Sin dependencias locales pesadas.",
+          faq_eyebrow: "Preguntas Frecuentes",
+          faq_title: "Aclaraciones Técnicas y Funcionamiento",
+          faq_subtitle: "Respuestas directas sobre el almacenamiento de Claude y las garantías de seguridad.",
+          faq_q1: "¿Borrar transcripts afecta a las sesiones activas de Claude Code?",
+          faq_a1: "No. La herramienta aplica una guarda inviolable de 24 horas (ActiveSessionGrace = TimeSpan.FromHours(24)). Cualquier transcript creado o modificado en las últimas 24h se omite incondicionalmente, incluso con retención de 0 días.",
+          faq_q2: "¿Por qué el archivado se bloquea si Claude Desktop está abierto?",
+          faq_a2: "Claude Desktop guarda sus sesiones en memoria y las escribe en disco al cerrarse. Si se modificaran con la app abierta, Claude sobrescribiría los cambios al cerrarse. Por seguridad, el sistema detecta claude.exe y pospone el archivado.",
+          faq_q3: "¿Archivar sesiones en Claude Desktop borra los archivos físicos?",
+          faq_a3: "No. El archivado solo cambia la bandera del encabezado (\"isArchived\": true) para que las sesiones antiguas no saturen la barra lateral. Los archivos siguen en %APPDATA%\\Claude\\claude-code-sessions. Solo los transcripts CLI se eliminan físicamente al liberar disco.",
+          faq_q4: "¿Qué secretos se escanean durante el descubrimiento de contexto?",
+          faq_a4: "El escáner examina los primeros 64KB de cada archivo de contexto (CLAUDE.md, skills, hooks) buscando claves SSH privadas, claves AWS (AKIA...), tokens PAT de GitHub (ghp_...) y webhooks de Slack. Los archivos con secretos son excluidos del respaldo.",
+          footer_credits: "Licencia Open Source MIT · Creado con WinUI 3 y .NET 9 para Windows 11",
+          footer_back_top: "Volver arriba ↑"
+        }
+      };
+
+      let currentLang = 'en';
+
+      // Autodetect browser language or read saved
+      try {
+        const savedLang = localStorage.getItem('cdt_lang');
+        if (savedLang && translations[savedLang]) {
+          currentLang = savedLang;
+        } else if (navigator.language && navigator.language.toLowerCase().startsWith('es')) {
+          currentLang = 'es';
+        }
+      } catch (e) {}
+
+      function updateLanguage(lang) {
+        currentLang = lang;
+        try { localStorage.setItem('cdt_lang', lang); } catch (e) {}
+
+        const dict = translations[lang] || translations.en;
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.getAttribute('data-i18n');
+          if (dict[key]) {
+            el.textContent = dict[key];
+          }
+        });
+
+        document.getElementById('langLabel').textContent = (lang === 'en') ? 'ES' : 'EN';
+        document.documentElement.setAttribute('lang', lang);
+
+        if (typeof calculateSavings === 'function') {
+          calculateSavings();
+        }
+      }
+
+      // Initialize language
+      updateLanguage(currentLang);
+
+      document.getElementById('langToggle').addEventListener('click', function () {
+        const nextLang = (currentLang === 'en') ? 'es' : 'en';
+        updateLanguage(nextLang);
+        showToast(nextLang === 'en' ? 'Language switched to English' : 'Idioma cambiado a Español');
+      });
+
+      /* ==========================================
+         Theme Toggle Engine
+         ========================================== */
+      const themeToggleBtn = document.getElementById('themeToggle');
+      const sunIcon = document.getElementById('themeIconSun');
+      const moonIcon = document.getElementById('themeIconMoon');
+
+      function syncThemeIcons(theme) {
+        if (theme === 'light') {
+          sunIcon.style.display = 'none';
+          moonIcon.style.display = 'block';
+        } else {
+          sunIcon.style.display = 'block';
+          moonIcon.style.display = 'none';
+        }
+      }
+
+      const activeTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      syncThemeIcons(activeTheme);
+
+      themeToggleBtn.addEventListener('click', function () {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const newTheme = isDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        try { localStorage.setItem('cdt_theme', newTheme); } catch (e) {}
+        syncThemeIcons(newTheme);
+      });
+
+
+      /* ==========================================
+         Interactive ROI Savings Calculator
+         ========================================== */
+      const promptSlider = document.getElementById('promptCount');
+      const repoSlider = document.getElementById('repoCount');
+      const promptCountVal = document.getElementById('promptCountVal');
+      const repoCountVal = document.getElementById('repoCountVal');
+
+      const reclaimedDiskVal = document.getElementById('reclaimedDiskVal');
+      const organizedSessionsVal = document.getElementById('organizedSessionsVal');
+      const timeSavedVal = document.getElementById('timeSavedVal');
+
+      function calculateSavings() {
+        const prompts = parseInt(promptSlider.value, 10);
+        const repos = parseInt(repoSlider.value, 10);
+
+        promptCountVal.textContent = prompts + (currentLang === 'es' ? ' prompts/sem' : ' prompts/wk');
+        repoCountVal.textContent = repos + (currentLang === 'es' ? ' repositorios' : ' repositories');
+
+        // Approx 1.2 MB per prompt exchange, 52 weeks
+        const annualMB = (prompts * 1.2 * 52);
+        const annualGB = (annualMB / 1024).toFixed(1);
+
+        // Cluttered sessions: roughly 0.6 per 10 prompts * repos
+        const annualSessions = Math.round((prompts * 0.06 * 52) + (repos * 8));
+
+        // Time saved in discovery: approx 2.5 minutes per week per repo
+        const hoursSaved = ((repos * 2.5 * 52) / 60).toFixed(1);
+
+        reclaimedDiskVal.textContent = annualGB + ' GB';
+        organizedSessionsVal.textContent = annualSessions;
+        timeSavedVal.textContent = hoursSaved + (currentLang === 'es' ? ' hrs' : ' hrs');
+      }
+
+      promptSlider.addEventListener('input', calculateSavings);
+      repoSlider.addEventListener('input', calculateSavings);
+      calculateSavings();
+
+      /* ==========================================
+         FAQ Accordion
+         ========================================== */
+      window.toggleFaq = function (button) {
+        const item = button.closest('.faq-item');
+        const isOpen = item.classList.contains('open');
+
+        // Close others
+        document.querySelectorAll('.faq-item').forEach(i => {
+          i.classList.remove('open');
+          const btn = i.querySelector('.faq-trigger');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        });
+
+        if (!isOpen) {
+          item.classList.add('open');
+          button.setAttribute('aria-expanded', 'true');
+        }
+      };
+
+      /* ==========================================
+         Clipboard & Toast Engine
+         ========================================== */
+      let toastTimeout;
+      window.showToast = function (msg) {
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toastMsg');
+        toastMsg.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 2800);
+      };
+
+      window.copySnippet = function (text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            showToast(currentLang === 'es' ? 'Comando copiado al portapapeles' : 'Command copied to clipboard!');
+          }).catch(() => fallbackCopy(text));
+        } else {
+          fallbackCopy(text);
+        }
+      };
+
+      function fallbackCopy(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          showToast(currentLang === 'es' ? 'Comando copiado al portapapeles' : 'Command copied to clipboard!');
+        } catch (err) {
+          showToast('Failed to copy');
+        }
+        document.body.removeChild(textArea);
+      }
+
+    })();
+  </script>
+</body>
+</html>
