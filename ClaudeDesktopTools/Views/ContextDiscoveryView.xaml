@@ -37,54 +37,110 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Command="{x:Bind ViewModel.SyncToDriveCommand}"
-                        IsEnabled="{x:Bind ViewModel.IsDriveConfigured}"
-                        ToolTipService.ToolTip="Configura la Web App de Google Drive en Ajustes para habilitar esto.">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE753;" />
-                        <TextBlock Text="Sincronizar sin seguimiento a Drive" />
-                    </StackPanel>
-                </Button>
-                <ProgressRing IsActive="{x:Bind ViewModel.IsSyncingToDrive, Mode=OneWay}" Width="20" Height="20" />
-                <TextBlock Text="{x:Bind ViewModel.DriveSyncStatusMessage, Mode=OneWay}" VerticalAlignment="Center"
-                           Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button Command="{x:Bind ViewModel.SelectAllCommand}" Content="Seleccionar todo" />
+                <Button Command="{x:Bind ViewModel.DeselectAllCommand}" Content="Deseleccionar todo" />
             </StackPanel>
+
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="16,12">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto, Auto, *, Auto">
+                        <Button Grid.Column="0"
+                                Command="{x:Bind ViewModel.SyncToDriveCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanSyncToDrive, Mode=OneWay}"
+                                ToolTipService.ToolTip="Configura la Web App de Google Drive en Ajustes para habilitar esto.">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE753;" />
+                                <TextBlock Text="Sincronizar sin seguimiento a Drive" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Margin="8,0,0,0"
+                                Command="{x:Bind ViewModel.CancelDriveSyncCommand}"
+                                Visibility="{x:Bind BoolToVisibility(ViewModel.IsSyncingToDrive), Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE71A;" />
+                                <TextBlock Text="Cancelar" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.DriveSyncStatusMessage, Mode=OneWay}"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"
+                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="3" VerticalAlignment="Center"
+                                   Visibility="{x:Bind BoolToVisibility(ViewModel.IsSyncingToDrive), Mode=OneWay}"
+                                   Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold">
+                            <Run Text="{x:Bind ViewModel.DriveSyncCurrentCount, Mode=OneWay}" />
+                            <Run Text="/" />
+                            <Run Text="{x:Bind ViewModel.DriveSyncTotalCount, Mode=OneWay}" />
+                            <Run Text="archivos" />
+                        </TextBlock>
+                    </Grid>
+
+                    <StackPanel Spacing="4" Visibility="{x:Bind BoolToVisibility(ViewModel.IsSyncingToDrive), Mode=OneWay}">
+                        <ProgressBar Value="{x:Bind ViewModel.DriveSyncProgressPercentage, Mode=OneWay}"
+                                     IsIndeterminate="{x:Bind ViewModel.IsDriveSyncIndeterminate, Mode=OneWay}"
+                                     Minimum="0" Maximum="100" />
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.DriveSyncProgressDetail, Mode=OneWay}"
+                                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.DriveSyncProgressPercentageText, Mode=OneWay}"
+                                       Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
-        <!-- Discovered Candidates List -->
-        <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Candidates, Mode=OneWay}"
+        <!-- Discovered Candidates, Grouped by Category -->
+        <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.GroupedCandidates, Mode=OneWay}"
                   SelectionMode="None">
             <ListView.ItemTemplate>
-                <DataTemplate x:DataType="models:ClaudeDiscoveryCandidate">
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,4">
-                        <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                            <StackPanel Grid.Column="0" Spacing="4">
-                                <TextBlock Text="{x:Bind RelativePath}" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <TextBlock Text="{x:Bind FilePath}" Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0" Spacing="2">
-                                <TextBlock Text="{x:Bind SizeDisplay}" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Right" />
-                                <TextBlock Text="{x:Bind LastModified}" Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" />
-                            </StackPanel>
-
-                            <Border Grid.Column="2" VerticalAlignment="Center" CornerRadius="4" Padding="8,4" Margin="0,0,8,0"
-                                    Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                <TextBlock Text="{x:Bind Category}"
-                                           Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
-                            </Border>
-
-                            <Border Grid.Column="3" VerticalAlignment="Center" CornerRadius="4" Padding="8,4"
-                                    Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                <TextBlock Text="{x:Bind StatusBadge}"
-                                           Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
-                            </Border>
+                <DataTemplate x:DataType="models:CandidateGroup">
+                    <StackPanel Spacing="4" Margin="0,12,0,4">
+                        <Grid ColumnDefinitions="*, Auto, Auto">
+                            <TextBlock Grid.Column="0" Text="{x:Bind Category}" VerticalAlignment="Center"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <Button Grid.Column="1" Margin="0,0,8,0" Tag="{x:Bind}" Click="SelectAllInGroup_Click">
+                                <TextBlock Text="Seleccionar todo" />
+                            </Button>
+                            <Button Grid.Column="2" Tag="{x:Bind}" Click="DeselectAllInGroup_Click">
+                                <TextBlock Text="Ninguno" />
+                            </Button>
                         </Grid>
-                    </Border>
+
+                        <ItemsControl ItemsSource="{x:Bind}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:ClaudeDiscoveryCandidate">
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,4">
+                                        <Grid ColumnDefinitions="Auto, *, Auto, Auto">
+                                            <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                      IsChecked="{x:Bind IsSelected, Mode=TwoWay}" />
+
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="{x:Bind RelativePath}" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                                <TextBlock Text="{x:Bind FilePath}" Style="{ThemeResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0" Spacing="2">
+                                                <TextBlock Text="{x:Bind SizeDisplay}" Style="{ThemeResource CaptionTextBlockStyle}" HorizontalAlignment="Right" />
+                                                <TextBlock Text="{x:Bind LastModified}" Style="{ThemeResource CaptionTextBlockStyle}"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" />
+                                            </StackPanel>
+
+                                            <Border Grid.Column="3" VerticalAlignment="Center" CornerRadius="4" Padding="8,4"
+                                                    Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                                <TextBlock Text="{x:Bind StatusBadge}"
+                                                           Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>

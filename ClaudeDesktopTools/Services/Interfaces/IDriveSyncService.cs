@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,5 +13,5 @@ public interface IDriveSyncService
 
     void UpdateSettings(DriveSyncSettings settings);
     Task<DriveSyncResult> TestConnectionAsync(CancellationToken cancellationToken = default);
-    Task<DriveSyncResult> SyncCandidatesAsync(IEnumerable<ClaudeDiscoveryCandidate> candidates, CancellationToken cancellationToken = default);
+    Task<DriveSyncResult> SyncCandidatesAsync(IEnumerable<ClaudeDiscoveryCandidate> candidates, IProgress<DriveSyncProgress>? progress = null, CancellationToken cancellationToken = default);
 }

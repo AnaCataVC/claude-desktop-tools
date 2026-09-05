@@ -67,7 +67,7 @@ public class DriveSyncService : IDriveSyncService
         return result;
     }
 
-    public async Task<DriveSyncResult> SyncCandidatesAsync(IEnumerable<ClaudeDiscoveryCandidate> candidates, CancellationToken cancellationToken = default)
+    public async Task<DriveSyncResult> SyncCandidatesAsync(IEnumerable<ClaudeDiscoveryCandidate> candidates, IProgress<DriveSyncProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         var result = new DriveSyncResult();
         if (!IsConfigured)
@@ -80,9 +80,16 @@ public class DriveSyncService : IDriveSyncService
         // already has its history preserved in its own repository.
         var toSync = candidates.Where(c => !c.IsTrackedByGit).ToList();
 
+        progress?.Report(DriveSyncProgress.Initial(toSync.Count));
+
+        int current = 0;
         foreach (var candidate in toSync)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            current++;
+            string fileName = Path.GetFileName(candidate.FilePath);
+            progress?.Report(DriveSyncProgress.FileStep(current, toSync.Count, fileName, candidate.RelativePath, DriveSyncStepStatus.Uploading, result.Uploaded, result.Failed));
 
             byte[] bytes;
             try
@@ -93,6 +100,7 @@ public class DriveSyncService : IDriveSyncService
             {
                 result.Failed++;
                 result.Errors.Add($"{candidate.RelativePath}: no se pudo leer ({ex.Message})");
+                progress?.Report(DriveSyncProgress.FileStep(current, toSync.Count, fileName, candidate.RelativePath, DriveSyncStepStatus.FileFailed, result.Uploaded, result.Failed));
                 continue;
             }
 
@@ -100,12 +108,13 @@ public class DriveSyncService : IDriveSyncService
             {
                 result.Failed++;
                 result.Errors.Add($"{candidate.RelativePath}: excede el tamaño máximo permitido ({MaxFileSizeBytes / 1024 / 1024} MB)");
+                progress?.Report(DriveSyncProgress.FileStep(current, toSync.Count, fileName, candidate.RelativePath, DriveSyncStepStatus.FileFailed, result.Uploaded, result.Failed));
                 continue;
             }
 
-            string relativePath = BuildDriveRelativePath(candidate, _settings.DestinationPrefix);
+            string relativePath = BuildDriveRelativePath(candidate, _settings.DestinationPrefix, _settings.NoRepoBucketName, _settings.ClaudeConfigBucketName);
             string mimeType = candidate.Category == ClaudeDiscoveryCategory.Hook ? "text/plain" : "text/markdown";
-            var (success, message) = await PostFileAsync(Path.GetFileName(candidate.FilePath), relativePath, mimeType, bytes, cancellationToken);
+            var (success, message) = await PostFileAsync(fileName, relativePath, mimeType, bytes, cancellationToken);
 
             if (success)
             {
@@ -117,8 +126,12 @@ public class DriveSyncService : IDriveSyncService
                 result.Errors.Add($"{candidate.RelativePath}: {message}");
             }
 
+            progress?.Report(DriveSyncProgress.FileStep(current, toSync.Count, fileName, candidate.RelativePath, success ? DriveSyncStepStatus.FileUploaded : DriveSyncStepStatus.FileFailed, result.Uploaded, result.Failed));
+
             await Task.Delay(300, cancellationToken);
         }
+
+        progress?.Report(DriveSyncProgress.Finished(toSync.Count, result.Uploaded, result.Failed));
 
         result.Message = toSync.Count == 0
             ? "No hay archivos sin seguimiento para sincronizar."
@@ -133,7 +146,11 @@ public class DriveSyncService : IDriveSyncService
     /// Recreates the file's project-relative path under a destination prefix so files with
     /// the same name from different repos never collide in Drive.
     /// </summary>
-    public static string BuildDriveRelativePath(ClaudeDiscoveryCandidate candidate, string destinationPrefix)
+    public static string BuildDriveRelativePath(
+        ClaudeDiscoveryCandidate candidate,
+        string destinationPrefix,
+        string noRepoBucketName = "_sin-repo",
+        string claudeConfigBucketName = "_claude-config")
     {
         string projectSegment;
         if (!string.IsNullOrEmpty(candidate.RepositoryRoot))
@@ -143,12 +160,12 @@ public class DriveSyncService : IDriveSyncService
         else if (candidate.Category != ClaudeDiscoveryCategory.Context)
         {
             // Skills/agents/scheduled tasks/hooks with no repo root are global ~/.claude config,
-            // not a loose file -- group them under their own bucket instead of "_sin-repo".
-            projectSegment = "_claude-config";
+            // not a loose file -- group them under their own bucket instead of the no-repo one.
+            projectSegment = string.IsNullOrWhiteSpace(claudeConfigBucketName) ? "_claude-config" : claudeConfigBucketName.Trim();
         }
         else
         {
-            projectSegment = "_sin-repo";
+            projectSegment = string.IsNullOrWhiteSpace(noRepoBucketName) ? "_sin-repo" : noRepoBucketName.Trim();
         }
 
         string relative = candidate.RelativePath.Replace('\\', '/');

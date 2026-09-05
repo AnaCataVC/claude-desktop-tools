@@ -163,10 +163,14 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
             else
             {
                 var fi = new FileInfo(file);
+                // Orphan files (no git repo) keep their full path relative to the scan root instead
+                // of just the filename -- otherwise every stray "CLAUDE.md" from a different folder
+                // collapses onto the same "_sin-repo/CLAUDE.md" Drive destination and overwrites the
+                // last one uploaded. Same technique as work-activity-panel's ClaudeConfigDiscovery.
                 report.Candidates.Add(new ClaudeDiscoveryCandidate
                 {
                     FilePath = file,
-                    RelativePath = explicitRelativePath.TryGetValue(file, out var relPath) ? relPath : Path.GetFileName(file),
+                    RelativePath = explicitRelativePath.TryGetValue(file, out var relPath) ? relPath : Path.GetRelativePath(rootPath, file).Replace('\\', '/'),
                     RepositoryRoot = string.Empty,
                     Category = categoryByPath.TryGetValue(file, out var category) ? category : ClaudeDiscoveryCategory.Context,
                     IsTrackedByGit = false,

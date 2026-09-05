@@ -129,4 +129,36 @@ public class ClaudeConfigDiscoveryServiceTests : IDisposable
 
         Assert.DoesNotContain(report.Candidates, c => c.FilePath.EndsWith("state.json"));
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DiscoverAsync_MultipleOrphanClaudeFilesKeepDistinctRelativePaths()
+    {
+        // Two unrelated folders, neither tracked by git, each with their own CLAUDE.md.
+        // Before the fix, both collapsed to RelativePath "CLAUDE.md" and would overwrite
+        // each other once uploaded to the same Drive destination.
+        string projectA = Path.Combine(_tempDir, "project-a");
+        string projectB = Path.Combine(_tempDir, "nested", "project-b");
+        Directory.CreateDirectory(projectA);
+        Directory.CreateDirectory(projectB);
+        File.WriteAllText(Path.Combine(projectA, "CLAUDE.md"), "# Project A context");
+        File.WriteAllText(Path.Combine(projectB, "CLAUDE.md"), "# Project B context");
+
+        var service = new ClaudeConfigDiscoveryService();
+        var report = await service.DiscoverAsync(_tempDir, maxDepth: 4);
+
+        var orphanClaudeFiles = report.Candidates
+            .Where(c => c.FilePath.EndsWith("CLAUDE.md") && string.IsNullOrEmpty(c.RepositoryRoot))
+            .ToList();
+
+        Assert.Equal(2, orphanClaudeFiles.Count);
+        Assert.Equal(2, orphanClaudeFiles.Select(c => c.RelativePath).Distinct().Count());
+        Assert.Contains(orphanClaudeFiles, c => c.RelativePath == "project-a/CLAUDE.md");
+        Assert.Contains(orphanClaudeFiles, c => c.RelativePath == "nested/project-b/CLAUDE.md");
+
+        var drivePaths = orphanClaudeFiles
+            .Select(c => DriveSyncService.BuildDriveRelativePath(c, "claude-md-unversioned"))
+            .Distinct()
+            .ToList();
+        Assert.Equal(2, drivePaths.Count);
+    }
 }

@@ -67,7 +67,23 @@
                     <TextBox Header="Prefijo de carpeta destino en Drive"
                              Text="{x:Bind ViewModel.DriveDestinationPrefix, Mode=TwoWay}" />
 
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Nombres de carpeta para archivos sin repositorio Git" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Text="CLAUDE.md y references sueltos van a la primera carpeta; skills, agentes, tareas programadas y hooks sueltos van a la segunda."
+                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <TextBox Header="Carpeta para CLAUDE.md/references sin repo"
+                                 Text="{x:Bind ViewModel.DriveNoRepoBucketName, Mode=TwoWay}" Margin="0,4,0,0" />
+                        <TextBox Header="Carpeta para skills/agentes/hooks sin repo"
+                                 Text="{x:Bind ViewModel.DriveClaudeConfigBucketName, Mode=TwoWay}" Margin="0,8,0,0" />
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Command="{x:Bind ViewModel.SaveDriveSettingsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE74E;" />
+                                <TextBlock Text="Guardar configuración de Drive" />
+                            </StackPanel>
+                        </Button>
                         <Button Command="{x:Bind ViewModel.TestDriveConnectionCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE701;" />
@@ -76,6 +92,9 @@
                         </Button>
                         <ProgressRing IsActive="{x:Bind ViewModel.IsTestingDriveConnection, Mode=OneWay}" Width="20" Height="20" />
                     </StackPanel>
+
+                    <TextBlock Text="{x:Bind ViewModel.DriveSaveMessage, Mode=OneWay}"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
 
                     <TextBlock Text="{x:Bind ViewModel.DriveStatusMessage, Mode=OneWay}"
                                Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />

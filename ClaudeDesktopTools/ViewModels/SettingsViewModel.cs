@@ -31,10 +31,19 @@ public partial class SettingsViewModel : ObservableObject
     private string _driveDestinationPrefix;
 
     [ObservableProperty]
+    private string _driveClaudeConfigBucketName;
+
+    [ObservableProperty]
+    private string _driveNoRepoBucketName;
+
+    [ObservableProperty]
     private bool _isTestingDriveConnection;
 
     [ObservableProperty]
     private string _driveStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private string _driveSaveMessage = string.Empty;
 
     public SettingsViewModel(IClaudeMaintenanceService maintenanceService, IDriveSyncService driveSyncService)
     {
@@ -47,7 +56,19 @@ public partial class SettingsViewModel : ObservableObject
         _driveWebAppUrl = _driveSyncService.Settings.WebAppUrl;
         _driveAuthToken = _driveSyncService.Settings.AuthToken;
         _driveDestinationPrefix = _driveSyncService.Settings.DestinationPrefix;
+        _driveClaudeConfigBucketName = _driveSyncService.Settings.ClaudeConfigBucketName;
+        _driveNoRepoBucketName = _driveSyncService.Settings.NoRepoBucketName;
     }
+
+    /// <summary>Single source of truth for turning the Drive form fields into settings, so every save path (global, Drive-only, test-connection) persists the same shape.</summary>
+    private DriveSyncSettings BuildDriveSettingsFromForm() => new()
+    {
+        WebAppUrl = DriveWebAppUrl.Trim(),
+        AuthToken = DriveAuthToken.Trim(),
+        DestinationPrefix = string.IsNullOrWhiteSpace(DriveDestinationPrefix) ? "claude-md-unversioned" : DriveDestinationPrefix.Trim(),
+        ClaudeConfigBucketName = string.IsNullOrWhiteSpace(DriveClaudeConfigBucketName) ? "_claude-config" : DriveClaudeConfigBucketName.Trim(),
+        NoRepoBucketName = string.IsNullOrWhiteSpace(DriveNoRepoBucketName) ? "_sin-repo" : DriveNoRepoBucketName.Trim()
+    };
 
     [RelayCommand]
     public void SaveSettings()
@@ -58,14 +79,17 @@ public partial class SettingsViewModel : ObservableObject
             SessionRetentionDays = SessionRetentionDays
         });
 
-        _driveSyncService.UpdateSettings(new DriveSyncSettings
-        {
-            WebAppUrl = DriveWebAppUrl.Trim(),
-            AuthToken = DriveAuthToken.Trim(),
-            DestinationPrefix = string.IsNullOrWhiteSpace(DriveDestinationPrefix) ? "claude-md-unversioned" : DriveDestinationPrefix.Trim()
-        });
+        _driveSyncService.UpdateSettings(BuildDriveSettingsFromForm());
 
         SaveMessage = "Configuración guardada correctamente.";
+    }
+
+    /// <summary>Saves only the Drive card's fields, independent of the retention settings above -- so editing Drive settings has its own visible confirmation right where the fields are.</summary>
+    [RelayCommand]
+    public void SaveDriveSettings()
+    {
+        _driveSyncService.UpdateSettings(BuildDriveSettingsFromForm());
+        DriveSaveMessage = $"Configuración de Drive guardada correctamente ({DateTime.Now:HH:mm:ss}).";
     }
 
     [RelayCommand]
@@ -74,12 +98,7 @@ public partial class SettingsViewModel : ObservableObject
         if (IsTestingDriveConnection) return;
 
         // Persist first so the test uses whatever is currently typed in the form.
-        _driveSyncService.UpdateSettings(new DriveSyncSettings
-        {
-            WebAppUrl = DriveWebAppUrl.Trim(),
-            AuthToken = DriveAuthToken.Trim(),
-            DestinationPrefix = string.IsNullOrWhiteSpace(DriveDestinationPrefix) ? "claude-md-unversioned" : DriveDestinationPrefix.Trim()
-        });
+        _driveSyncService.UpdateSettings(BuildDriveSettingsFromForm());
 
         IsTestingDriveConnection = true;
         DriveStatusMessage = "Probando conexión...";
