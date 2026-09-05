@@ -14,10 +14,12 @@
     <Compile Include="..\ClaudeDesktopTools\Helpers\LocalSettingsHelper.cs" Link="Helpers\LocalSettingsHelper.cs" />
     <Compile Include="..\ClaudeDesktopTools\Services\Interfaces\*.cs" Link="Services\Interfaces\%(Filename)%(Extension)" />
     <Compile Include="..\ClaudeDesktopTools\Services\*.cs" Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\ClaudeDesktopTools\ViewModels\ContextDiscoveryViewModel.cs" Link="ViewModels\ContextDiscoveryViewModel.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />

@@ -15,13 +15,21 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     private readonly IClaudeConfigDiscoveryService _discoveryService;
     private readonly IDriveSyncService _driveSyncService;
     private CancellationTokenSource? _syncCts;
+    private List<CandidateGroup> _allGroups = new();
 
     [ObservableProperty]
     private ObservableCollection<ClaudeDiscoveryCandidate> _candidates = new();
 
-    /// <summary>Candidates grouped by category (CLAUDE.md, Skills, Agents, Scheduled Tasks, Hooks) for the view.</summary>
+    /// <summary>Candidates grouped by category (CLAUDE.md, Skills, Agents, Scheduled Tasks, Hooks) for the view, after applying <see cref="CategoryFilters"/>.</summary>
     [ObservableProperty]
     private ObservableCollection<CandidateGroup> _groupedCandidates = new();
+
+    /// <summary>One checkable entry per category, controlling which groups appear in <see cref="GroupedCandidates"/>.</summary>
+    public ObservableCollection<CategoryFilterOption> CategoryFilters { get; } = new(
+        ClaudeDiscoveryCategory.DisplayOrder.Select(c => new CategoryFilterOption(c)));
+
+    /// <summary>Categories available for the "select only this category" quick actions.</summary>
+    public IReadOnlyList<string> AvailableCategories => ClaudeDiscoveryCategory.DisplayOrder;
 
     [ObservableProperty]
     private bool _isScanning;
@@ -68,6 +76,11 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     {
         _discoveryService = discoveryService;
         _driveSyncService = driveSyncService;
+
+        foreach (var filter in CategoryFilters)
+        {
+            filter.PropertyChanged += (_, _) => ApplyCategoryFilter();
+        }
     }
 
     [RelayCommand]
@@ -146,10 +159,20 @@ public partial class ContextDiscoveryViewModel : ObservableObject
 
     private void RebuildGroups()
     {
+        _allGroups = CandidateGroup.BuildFrom(Candidates).ToList();
+        ApplyCategoryFilter();
+    }
+
+    private void ApplyCategoryFilter()
+    {
         GroupedCandidates.Clear();
-        foreach (var group in CandidateGroup.BuildFrom(Candidates))
+        foreach (var group in _allGroups)
         {
-            GroupedCandidates.Add(group);
+            var filter = CategoryFilters.FirstOrDefault(f => f.Category == group.Category);
+            if (filter is null || filter.IsChecked)
+            {
+                GroupedCandidates.Add(group);
+            }
         }
     }
 
@@ -163,6 +186,26 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     public void DeselectAll()
     {
         foreach (var candidate in Candidates) candidate.IsSelected = false;
+    }
+
+    /// <summary>Deselects every candidate already tracked by git, leaving untracked candidates' selection untouched.</summary>
+    [RelayCommand]
+    public void DeselectGitTracked()
+    {
+        foreach (var candidate in Candidates.Where(c => c.IsTrackedByGit)) candidate.IsSelected = false;
+    }
+
+    /// <summary>Shows every category's group again after some were hidden via <see cref="CategoryFilters"/>.</summary>
+    [RelayCommand]
+    public void ShowAllCategories()
+    {
+        foreach (var filter in CategoryFilters) filter.IsChecked = true;
+    }
+
+    /// <summary>Marks only the given category's candidates as selected for sync, deselecting every other category.</summary>
+    public void SelectOnlyCategory(string category)
+    {
+        foreach (var candidate in Candidates) candidate.IsSelected = candidate.Category == category;
     }
 
     public void SetGroupSelection(CandidateGroup group, bool isSelected)

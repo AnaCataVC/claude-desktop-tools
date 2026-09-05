@@ -53,6 +53,20 @@ public class CandidateGroup : ObservableCollection<ClaudeDiscoveryCandidate>
 {
     public string Category { get; }
 
+    private bool _isExpanded = true;
+
+    /// <summary>Whether this category's list is expanded in the discovery view. Defaults to expanded.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded == value) return;
+            _isExpanded = value;
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(IsExpanded)));
+        }
+    }
+
     public CandidateGroup(string category, IEnumerable<ClaudeDiscoveryCandidate> items) : base(items)
     {
         Category = category;
@@ -71,6 +85,31 @@ public class CandidateGroup : ObservableCollection<ClaudeDiscoveryCandidate>
         }
         return groups;
     }
+}
+
+/// <summary>A toggle for showing/hiding one category's group in the discovery view's filtered list.</summary>
+public class CategoryFilterOption : INotifyPropertyChanged
+{
+    public string Category { get; }
+
+    private bool _isChecked = true;
+    public bool IsChecked
+    {
+        get => _isChecked;
+        set
+        {
+            if (_isChecked == value) return;
+            _isChecked = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsChecked)));
+        }
+    }
+
+    public CategoryFilterOption(string category)
+    {
+        Category = category;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 public class ClaudeDiscoveryReport

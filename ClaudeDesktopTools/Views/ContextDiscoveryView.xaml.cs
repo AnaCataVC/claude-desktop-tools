@@ -33,4 +33,12 @@ public sealed partial class ContextDiscoveryView : Page
             ViewModel.SetGroupSelection(group, false);
         }
     }
+
+    private void SelectOnlyCategory_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string category })
+        {
+            ViewModel.SelectOnlyCategory(category);
+        }
+    }
 }
