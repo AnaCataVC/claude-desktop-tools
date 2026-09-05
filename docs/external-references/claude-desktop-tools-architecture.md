@@ -36,7 +36,8 @@ The foundational business logic was previously decoupled from `work-activity-pan
 
 ### 2.3 Testing Framework
 
-- **`xUnit` (2.9.x) + `Moq` (4.20.x):** Unit testing of file manipulation invariants, grace windows, process collision guards, and regex header replacement.
+- **`xUnit` (2.5.3):** Unit testing of file manipulation invariants, grace windows, process collision guards, and regex header replacement.
+- No mocking library: `Process` is a sealed BCL class that cannot be mocked, so tests spawn real, disposable child processes (`ping.exe -n 60 127.0.0.1`) to exercise PID liveness, start-time matching, `Process.Kill()`, `EmptyWorkingSet`, and `PriorityClass` against genuine OS state instead of a substitute.
 - Testing project targeting `net9.0` with references to service contracts and logic to avoid WinRT runtime initialization overhead in CI.
 
 ---
@@ -68,6 +69,10 @@ The foundational business logic was previously decoupled from `work-activity-pan
    - The path listed under item 1 above (`%APPDATA%\Claude\claude-code-sessions`) is the Desktop app's own session index, read only by `ClaudeMaintenanceService.GetSessionsAsync()` for the Dashboard's archiving preview (`DashboardViewModel.GetStaleDesktopSessionsPreviewAsync`). That folder does not exist on a machine where `claude` is only ever run from a terminal.
    - The Sessions view (`SessionsViewModel`) instead calls a separate method, `GetCliSessionsAsync()`, which lists one entry per top-level transcript directly under `%USERPROFILE%\.claude\projects\<project-folder>\<sessionId>.jsonl` (`Directory.GetFiles(..., SearchOption.TopDirectoryOnly)`, excluding nested `subagents/` transcripts). The two methods intentionally read different stores and are not interchangeable.
 
+8. **Process Resource Actions Re-Verify Name and StartTime at Action Time (added 2026-09-05):**
+   - `ProcessMonitorService` lists RAM/CPU for every process matching a target name (`"claude"` by default, injectable for tests) via `Process.GetProcessesByName`, refreshed on a 2-second `DispatcherTimer` in `ProcessMonitorView`. CPU% is derived from the delta of `TotalProcessorTime` between two scans (`ComputeCpuPercent`), keyed by `(int Pid, DateTime StartTime)` to reject cross-process deltas caused by OS PID recycling.
+   - `TrimWorkingSet(pid, expectedStartTime)` (`EmptyWorkingSet` via `psapi.dll`) and `SetLowPriority(pid, lowPriority, expectedStartTime)` (`Process.PriorityClass`) both re-resolve the process by pid and re-check its name and `StartTime` before acting, guarding against the same pid-recycling window as invariant #3/#7. Both actions are reversible and lossless, so — unlike every other mutating action in this app — they skip the `ContentDialog` + `_dialogLock` confirmation pattern (invariant #5).
+
 ---
 
 ## 4. Architectural Alternatives Evaluated
@@ -77,4 +82,4 @@ The foundational business logic was previously decoupled from `work-activity-pan
   - *Cons:* Harder to run unit tests in `net9.0` without WinRT dependencies; tight coupling between UI and file system IO.
 - **Option B (Clean Modular Architecture - Recommended):**
   - `ClaudeDesktopTools` (WinUI 3 App): Unpackaged executable, MainWindow, Views, ViewModels, SystemBackdrop (Mica), Dialogs, Navigation. Includes Core Services and Models.
-  - `ClaudeDesktopTools.Tests` (xUnit): Comprehensive automated test suite verifying all 6 safety invariants, referencing models and services cleanly.
+  - `ClaudeDesktopTools.Tests` (xUnit): Comprehensive automated test suite (84 tests) verifying the safety invariants above, referencing models and services cleanly.
