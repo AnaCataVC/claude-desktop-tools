@@ -1,19 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using ClaudeDesktopTools.Models;
 using ClaudeDesktopTools.ViewModels;
 
 namespace ClaudeDesktopTools.Views;
 
 public sealed partial class DashboardView : Page
 {
-    private const int MaxPreviewItems = 20;
-
     public DashboardViewModel ViewModel { get; }
 
     // Semaphore prevents WinUI 3 dialog collision crashes
@@ -41,7 +35,7 @@ public sealed partial class DashboardView : Page
             {
                 XamlRoot = this.XamlRoot,
                 Title = "Liberar espacio en disco",
-                Content = BuildPreviewContent(
+                Content = PreviewDialogHelper.BuildPreviewContent(
                     "Esta acción eliminará de forma permanente los transcripts de Claude CLI anteriores a la retención configurada.\n\n" +
                     "Nota de seguridad: Cualquier archivo modificado en las últimas 24 horas se conservará intacto independientemente de la retención.",
                     preview,
@@ -79,7 +73,7 @@ public sealed partial class DashboardView : Page
             {
                 XamlRoot = this.XamlRoot,
                 Title = "Archivar sesiones antiguas",
-                Content = BuildPreviewContent(
+                Content = PreviewDialogHelper.BuildPreviewContent(
                     "Esta acción marca las sesiones como archivadas para que salgan de la lista de Claude Desktop. No libera espacio en disco.",
                     preview,
                     "No hay sesiones fuera de la retención configurada.",
@@ -99,37 +93,5 @@ public sealed partial class DashboardView : Page
         {
             _dialogLock.Release();
         }
-    }
-
-    private static StackPanel BuildPreviewContent(
-        string introText, List<ClaudeSessionItem> items, string emptyText, string countText)
-    {
-        var panel = new StackPanel { Spacing = 8, MaxWidth = 480 };
-        panel.Children.Add(new TextBlock { Text = introText, TextWrapping = TextWrapping.Wrap });
-
-        if (items.Count == 0)
-        {
-            panel.Children.Add(new TextBlock { Text = emptyText, TextWrapping = TextWrapping.Wrap });
-            return panel;
-        }
-
-        panel.Children.Add(new TextBlock { Text = countText, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-
-        var names = items
-            .Take(MaxPreviewItems)
-            .Select(i => $"• {i.WorkingDirectory}  ({i.FileSizeDisplay})");
-        var namesText = string.Join("\n", names);
-        if (items.Count > MaxPreviewItems)
-        {
-            namesText += $"\n… y {items.Count - MaxPreviewItems} más.";
-        }
-
-        panel.Children.Add(new ScrollViewer
-        {
-            MaxHeight = 240,
-            Content = new TextBlock { Text = namesText, TextWrapping = TextWrapping.Wrap }
-        });
-
-        return panel;
     }
 }

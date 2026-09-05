@@ -14,5 +14,9 @@ public interface IClaudeMaintenanceService
     Task<ClaudeCleanupResult> DeleteStaleTranscriptsAsync(CancellationToken cancellationToken = default);
     Task<ClaudeCleanupResult> ArchiveStaleSessionsAsync(CancellationToken cancellationToken = default);
     Task<List<ClaudeSessionItem>> GetSessionsAsync(CancellationToken cancellationToken = default);
+    Task<List<ClaudeSessionItem>> GetCliSessionsAsync(CancellationToken cancellationToken = default);
+    ClaudeCleanupResult CloseSession(int processId, string sessionId);
+    ClaudeCleanupResult DeleteTranscript(string filePath);
+    ClaudeCleanupResult DeleteTranscripts(IEnumerable<string> filePaths);
     bool IsClaudeRunning();
 }

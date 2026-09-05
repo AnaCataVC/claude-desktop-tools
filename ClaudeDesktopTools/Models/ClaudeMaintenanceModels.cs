@@ -80,11 +80,30 @@ public class ClaudeSessionItem
     public string SessionId { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public string WorkingDirectory { get; set; } = string.Empty;
+
+    /// <summary>Friendly name Claude Code derives for a live session (e.g. "claude-desktop-tools-07").
+    /// Only available while the session is active -- not persisted anywhere once it ends.</summary>
+    public string SessionName { get; set; } = string.Empty;
+
+    public bool HasSessionName => !string.IsNullOrWhiteSpace(SessionName);
     public DateTime LastModified { get; set; }
     public long FileSizeBytes { get; set; }
     public bool IsArchived { get; set; }
     public bool IsStale { get; set; }
 
-    public string StatusBadge => IsArchived ? "Archivada" : (IsStale ? "Archivable" : "Activa");
+    /// <summary>
+    /// True only when cross-referenced against ~/.claude/sessions/&lt;pid&gt;.json AND the
+    /// recorded PID is confirmed still running with a matching start time (immune to PID reuse).
+    /// A recently-touched transcript alone (<see cref="IsStale"/> false) does NOT imply this.
+    /// </summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>Negation of <see cref="IsActive"/>, exposed for x:Bind (no inline "!" support).</summary>
+    public bool NotActive => !IsActive;
+
+    /// <summary>OS process id backing this session, set only when <see cref="IsActive"/> is true.</summary>
+    public int? ProcessId { get; set; }
+
+    public string StatusBadge => IsActive ? "Activa" : (IsArchived ? "Archivada" : (IsStale ? "Archivable" : "Inactiva"));
     public string FileSizeDisplay => ClaudeStoreReport.FormatBytes(FileSizeBytes);
 }
