@@ -17,7 +17,7 @@ Native Windows 11 desktop application crafted with **WinUI 3**, **.NET 9**, Flue
 ---
 
 <a name="english"></a>
-## 🇬🇧 English
+## English
 
 ### Overview & Purpose
 When collaborating intensively with Claude Code CLI and Claude Desktop across repositories, local storage and session lists accumulate without bound:
@@ -84,7 +84,7 @@ dotnet run --project ClaudeDesktopTools\ClaudeDesktopTools.csproj
 ---
 
 <a name="español"></a>
-## 🇪🇸 Español
+## Español
 
 ### Descripción y Propósito
 Al colaborar intensamente con Claude Code (CLI) y Claude Desktop en múltiples repositorios, el almacenamiento local y las listas de sesiones crecen sin límite:
