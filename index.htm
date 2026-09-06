@@ -399,26 +399,7 @@
       justify-content: center;
       gap: 1rem;
       flex-wrap: wrap;
-      margin-bottom: 2.5rem;
-    }
-
-    .quick-cli-box {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-default);
-      padding: 0.6rem 1.2rem;
-      border-radius: var(--radius-md);
-      font-family: var(--font-mono);
-      font-size: 0.88rem;
-      color: var(--text-primary);
-      box-shadow: var(--card-shadow);
-    }
-
-    .quick-cli-prompt {
-      color: var(--coral-500);
-      user-select: none;
+      margin-bottom: 0;
     }
 
     .copy-btn {
@@ -955,18 +936,6 @@
             </svg>
             <span data-i18n="hero_cta_github">GitHub Repository</span>
           </a>
-        </div>
-
-        <div class="quick-cli-box">
-          <span class="quick-cli-prompt">$</span>
-          <code>winget install AnaCataVC.ClaudeDesktopTools</code>
-          <button class="copy-btn" onclick="copySnippet('winget install AnaCataVC.ClaudeDesktopTools')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span data-i18n="btn_copy">Copy</span>
-          </button>
         </div>
       </div>
     </section>
