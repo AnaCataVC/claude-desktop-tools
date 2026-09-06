@@ -39,7 +39,7 @@ public partial class App : Application
                 // ViewModels
                 services.AddTransient<DashboardViewModel>();
                 services.AddTransient<SessionsViewModel>();
-                services.AddTransient<ContextDiscoveryViewModel>();
+                services.AddSingleton<ContextDiscoveryViewModel>();
                 services.AddTransient<SettingsViewModel>();
                 services.AddTransient<ProcessMonitorViewModel>();
             })
