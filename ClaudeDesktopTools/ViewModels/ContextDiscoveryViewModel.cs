@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,8 +45,19 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     private string _statusMessage = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSyncToDrive))]
     [NotifyCanExecuteChangedFor(nameof(SyncToDriveCommand))]
     private bool _isSyncingToDrive;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SyncButtonText))]
+    [NotifyPropertyChangedFor(nameof(CanSyncToDrive))]
+    [NotifyPropertyChangedFor(nameof(SyncButtonToolTip))]
+    [NotifyCanExecuteChangedFor(nameof(SyncToDriveCommand))]
+    private int _selectedCandidatesCount;
+
+    [ObservableProperty]
+    private string _lastSyncDisplay = string.Empty;
 
     [ObservableProperty]
     private string _driveSyncStatusMessage = string.Empty;
@@ -70,7 +82,26 @@ public partial class ContextDiscoveryViewModel : ObservableObject
 
     public bool IsDriveConfigured => _driveSyncService.IsConfigured;
 
-    public bool CanSyncToDrive => IsDriveConfigured && !IsSyncingToDrive;
+    public bool CanSyncToDrive => IsDriveConfigured && !IsSyncingToDrive && SelectedCandidatesCount > 0;
+
+    public string SyncButtonText => SelectedCandidatesCount switch
+    {
+        0 => "Sincronizar a Drive (0 seleccionados)",
+        1 => "Sincronizar 1 archivo sin seguimiento a Drive",
+        _ => $"Sincronizar {SelectedCandidatesCount} archivos sin seguimiento a Drive"
+    };
+
+    public string SyncButtonToolTip
+    {
+        get
+        {
+            if (!IsDriveConfigured)
+                return "Configura la Web App de Google Drive en Ajustes para habilitar esto.";
+            if (SelectedCandidatesCount == 0)
+                return "Selecciona al menos un archivo sin seguimiento para sincronizar.";
+            return "Sincroniza los archivos sin seguimiento seleccionados a Google Drive.";
+        }
+    }
 
     public ContextDiscoveryViewModel(IClaudeConfigDiscoveryService discoveryService, IDriveSyncService driveSyncService)
     {
@@ -81,6 +112,8 @@ public partial class ContextDiscoveryViewModel : ObservableObject
         {
             filter.PropertyChanged += (_, _) => ApplyCategoryFilter();
         }
+
+        UpdateLastSyncDisplay();
     }
 
     [RelayCommand]
@@ -94,13 +127,19 @@ public partial class ContextDiscoveryViewModel : ObservableObject
         try
         {
             var report = await _discoveryService.DiscoverAsync(TargetDirectory, MaxDepth);
-            Candidates.Clear();
-            foreach (var item in report.Candidates)
+            foreach (var c in Candidates)
             {
+                c.PropertyChanged -= OnCandidatePropertyChanged;
+            }
+            Candidates.Clear();
+            foreach (var item in report.Candidates.Where(c => !c.IsTrackedByGit))
+            {
+                item.PropertyChanged += OnCandidatePropertyChanged;
                 Candidates.Add(item);
             }
             RebuildGroups();
-            StatusMessage = $"Descubrimiento finalizado: {report.Candidates.Count} archivos encontrados ({report.UntrackedCandidatesCount} sin seguimiento git) en {report.RepositoriesScanned} repositorios.";
+            UpdateSelectionState();
+            StatusMessage = $"Descubrimiento finalizado: {Candidates.Count} archivos sin seguimiento git encontrados en {report.RepositoriesScanned} repositorios.";
         }
         catch (Exception ex)
         {
@@ -134,6 +173,7 @@ public partial class ContextDiscoveryViewModel : ObservableObject
             var selected = Candidates.Where(c => c.IsSelected).ToList();
             var result = await _driveSyncService.SyncCandidatesAsync(selected, progress, _syncCts.Token);
             DriveSyncStatusMessage = result.Message;
+            UpdateLastSyncDisplay();
         }
         catch (OperationCanceledException)
         {
@@ -180,19 +220,14 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     public void SelectAll()
     {
         foreach (var candidate in Candidates) candidate.IsSelected = true;
+        UpdateSelectionState();
     }
 
     [RelayCommand]
     public void DeselectAll()
     {
         foreach (var candidate in Candidates) candidate.IsSelected = false;
-    }
-
-    /// <summary>Deselects every candidate already tracked by git, leaving untracked candidates' selection untouched.</summary>
-    [RelayCommand]
-    public void DeselectGitTracked()
-    {
-        foreach (var candidate in Candidates.Where(c => c.IsTrackedByGit)) candidate.IsSelected = false;
+        UpdateSelectionState();
     }
 
     /// <summary>Shows every category's group again after some were hidden via <see cref="CategoryFilters"/>.</summary>
@@ -206,11 +241,40 @@ public partial class ContextDiscoveryViewModel : ObservableObject
     public void SelectOnlyCategory(string category)
     {
         foreach (var candidate in Candidates) candidate.IsSelected = candidate.Category == category;
+        UpdateSelectionState();
     }
 
     public void SetGroupSelection(CandidateGroup group, bool isSelected)
     {
         foreach (var candidate in group) candidate.IsSelected = isSelected;
+        UpdateSelectionState();
+    }
+
+    public void UpdateLastSyncDisplay()
+    {
+        var settings = _driveSyncService.Settings;
+        if (settings.LastSyncAt.HasValue)
+        {
+            var countText = settings.LastSyncCount == 1 ? "1 archivo" : $"{settings.LastSyncCount} archivos";
+            LastSyncDisplay = $"Última sincronización: {settings.LastSyncAt.Value:dd-MM-yyyy HH:mm} ({countText})";
+        }
+        else
+        {
+            LastSyncDisplay = "Última sincronización: Nunca";
+        }
+    }
+
+    private void OnCandidatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ClaudeDiscoveryCandidate.IsSelected))
+        {
+            UpdateSelectionState();
+        }
+    }
+
+    private void UpdateSelectionState()
+    {
+        SelectedCandidatesCount = Candidates.Count(c => c.IsSelected);
     }
 
     private void OnDriveSyncProgress(DriveSyncProgress progress)

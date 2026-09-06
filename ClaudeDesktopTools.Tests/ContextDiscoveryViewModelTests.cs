@@ -126,19 +126,75 @@ public class ContextDiscoveryViewModelTests
     }
 
     [Fact]
-    public async Task DeselectGitTrackedCommand_DeselectsOnlyTrackedCandidates_LeavesOthersUntouched()
+    public async Task Discover_ExcludesGitTrackedCandidates_PopulatesOnlyUntrackedInCandidatesAndGroups()
     {
         var trackedSkill = MakeCandidate(ClaudeDiscoveryCategory.Skill, tracked: true, selected: true);
         var untrackedSkill = MakeCandidate(ClaudeDiscoveryCategory.Skill, tracked: false, selected: true);
-        var untrackedAgentAlreadyOff = MakeCandidate(ClaudeDiscoveryCategory.Agent, tracked: false, selected: false);
-        var vm = CreateViewModel(new[] { trackedSkill, untrackedSkill, untrackedAgentAlreadyOff });
+        var vm = CreateViewModel(new[] { trackedSkill, untrackedSkill });
         await vm.DiscoverAsync();
 
-        vm.DeselectGitTrackedCommand.Execute(null);
+        Assert.Single(vm.Candidates);
+        Assert.Same(untrackedSkill, vm.Candidates[0]);
+        Assert.False(vm.Candidates[0].IsTrackedByGit);
 
-        Assert.False(trackedSkill.IsSelected);
-        Assert.True(untrackedSkill.IsSelected);
-        Assert.False(untrackedAgentAlreadyOff.IsSelected);
+        var skillGroup = Assert.Single(vm.GroupedCandidates);
+        Assert.Single(skillGroup);
+        Assert.Same(untrackedSkill, skillGroup[0]);
+    }
+
+    [Fact]
+    public async Task SelectedCandidatesCount_UpdatesReactively_WhenCandidateSelectionToggled()
+    {
+        var skillA = MakeCandidate(ClaudeDiscoveryCategory.Skill, tracked: false, selected: true);
+        var skillB = MakeCandidate(ClaudeDiscoveryCategory.Skill, tracked: false, selected: true);
+        var vm = CreateViewModel(new[] { skillA, skillB });
+        await vm.DiscoverAsync();
+
+        Assert.Equal(2, vm.SelectedCandidatesCount);
+        Assert.Equal("Sincronizar 2 archivos sin seguimiento a Drive", vm.SyncButtonText);
+
+        skillA.IsSelected = false;
+        Assert.Equal(1, vm.SelectedCandidatesCount);
+        Assert.Equal("Sincronizar 1 archivo sin seguimiento a Drive", vm.SyncButtonText);
+
+        skillB.IsSelected = false;
+        Assert.Equal(0, vm.SelectedCandidatesCount);
+        Assert.Equal("Sincronizar a Drive (0 seleccionados)", vm.SyncButtonText);
+        Assert.False(vm.CanSyncToDrive);
+    }
+
+    [Fact]
+    public async Task CanSyncToDrive_DisabledWhenZeroSelected_EvenIfDriveIsConfigured()
+    {
+        var skill = MakeCandidate(ClaudeDiscoveryCategory.Skill, tracked: false, selected: true);
+        var fakeDriveService = new FakeDriveSyncService();
+        fakeDriveService.Settings.WebAppUrl = "https://script.google.com/test/exec";
+        var vm = new ContextDiscoveryViewModel(new FakeDiscoveryService(new[] { skill }), fakeDriveService);
+        await vm.DiscoverAsync();
+
+        Assert.True(vm.CanSyncToDrive);
+        Assert.True(vm.SyncToDriveCommand.CanExecute(null));
+
+        vm.DeselectAllCommand.Execute(null);
+
+        Assert.Equal(0, vm.SelectedCandidatesCount);
+        Assert.False(vm.CanSyncToDrive);
+        Assert.False(vm.SyncToDriveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void LastSyncDisplay_ShowsNuncaInitially_AndUpdatesWithFormattedDateAndCount()
+    {
+        var fakeDriveService = new FakeDriveSyncService();
+        var vm = new ContextDiscoveryViewModel(new FakeDiscoveryService(Array.Empty<ClaudeDiscoveryCandidate>()), fakeDriveService);
+
+        Assert.Equal("Última sincronización: Nunca", vm.LastSyncDisplay);
+
+        fakeDriveService.Settings.LastSyncAt = new DateTime(2026, 9, 5, 22, 15, 0);
+        fakeDriveService.Settings.LastSyncCount = 143;
+        vm.UpdateLastSyncDisplay();
+
+        Assert.Equal("Última sincronización: 05-09-2026 22:15 (143 archivos)", vm.LastSyncDisplay);
     }
 
     [Fact]
@@ -206,11 +262,12 @@ public class ContextDiscoveryViewModelTests
 
     private sealed class FakeDriveSyncService : IDriveSyncService
     {
-        public DriveSyncSettings Settings { get; } = new();
-        public bool IsConfigured => false;
+        public DriveSyncSettings Settings { get; set; } = new();
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(Settings.WebAppUrl);
 
         public void UpdateSettings(DriveSyncSettings settings)
         {
+            Settings = settings;
         }
 
         public Task<DriveSyncResult> TestConnectionAsync(CancellationToken cancellationToken = default)

@@ -133,6 +133,13 @@ public class DriveSyncService : IDriveSyncService
 
         progress?.Report(DriveSyncProgress.Finished(toSync.Count, result.Uploaded, result.Failed));
 
+        if (result.Uploaded > 0)
+        {
+            _settings.LastSyncAt = DateTime.Now;
+            _settings.LastSyncCount = result.Uploaded;
+            UpdateSettings(_settings);
+        }
+
         result.Message = toSync.Count == 0
             ? "No hay archivos sin seguimiento para sincronizar."
             : result.Failed == 0

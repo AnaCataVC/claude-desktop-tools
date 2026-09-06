@@ -98,6 +98,9 @@
 
                     <TextBlock Text="{x:Bind ViewModel.DriveStatusMessage, Mode=OneWay}"
                                Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                    <TextBlock Text="{x:Bind ViewModel.DriveLastSyncDisplay, Mode=OneWay}"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
 

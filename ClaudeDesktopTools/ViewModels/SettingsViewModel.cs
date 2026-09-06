@@ -45,6 +45,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _driveSaveMessage = string.Empty;
 
+    [ObservableProperty]
+    private string _driveLastSyncDisplay = string.Empty;
+
     public SettingsViewModel(IClaudeMaintenanceService maintenanceService, IDriveSyncService driveSyncService)
     {
         _maintenanceService = maintenanceService;
@@ -58,6 +61,22 @@ public partial class SettingsViewModel : ObservableObject
         _driveDestinationPrefix = _driveSyncService.Settings.DestinationPrefix;
         _driveClaudeConfigBucketName = _driveSyncService.Settings.ClaudeConfigBucketName;
         _driveNoRepoBucketName = _driveSyncService.Settings.NoRepoBucketName;
+
+        UpdateDriveLastSyncDisplay();
+    }
+
+    public void UpdateDriveLastSyncDisplay()
+    {
+        var settings = _driveSyncService.Settings;
+        if (settings.LastSyncAt.HasValue)
+        {
+            var countText = settings.LastSyncCount == 1 ? "1 archivo" : $"{settings.LastSyncCount} archivos";
+            DriveLastSyncDisplay = $"Última sincronización: {settings.LastSyncAt.Value:dd-MM-yyyy HH:mm} ({countText})";
+        }
+        else
+        {
+            DriveLastSyncDisplay = "Última sincronización: Nunca";
+        }
     }
 
     /// <summary>Single source of truth for turning the Drive form fields into settings, so every save path (global, Drive-only, test-connection) persists the same shape.</summary>
@@ -67,7 +86,9 @@ public partial class SettingsViewModel : ObservableObject
         AuthToken = DriveAuthToken.Trim(),
         DestinationPrefix = string.IsNullOrWhiteSpace(DriveDestinationPrefix) ? "claude-md-unversioned" : DriveDestinationPrefix.Trim(),
         ClaudeConfigBucketName = string.IsNullOrWhiteSpace(DriveClaudeConfigBucketName) ? "_claude-config" : DriveClaudeConfigBucketName.Trim(),
-        NoRepoBucketName = string.IsNullOrWhiteSpace(DriveNoRepoBucketName) ? "_sin-repo" : DriveNoRepoBucketName.Trim()
+        NoRepoBucketName = string.IsNullOrWhiteSpace(DriveNoRepoBucketName) ? "_sin-repo" : DriveNoRepoBucketName.Trim(),
+        LastSyncAt = _driveSyncService.Settings.LastSyncAt,
+        LastSyncCount = _driveSyncService.Settings.LastSyncCount
     };
 
     [RelayCommand]

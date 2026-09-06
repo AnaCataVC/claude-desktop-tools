@@ -237,4 +237,47 @@ public class DriveSyncServiceTests : IDisposable
             File.Delete(candidate.FilePath);
         }
     }
+
+    [Fact]
+    public void DriveSyncSettings_RoundTripSerialization_PreservesLastSyncAtAndCount()
+    {
+        var service = new DriveSyncService();
+        var syncTime = new DateTime(2026, 9, 5, 22, 15, 0);
+
+        service.UpdateSettings(new DriveSyncSettings
+        {
+            WebAppUrl = "https://script.google.com/test",
+            LastSyncAt = syncTime,
+            LastSyncCount = 143
+        });
+
+        var reloadedService = new DriveSyncService();
+        Assert.Equal(syncTime, reloadedService.Settings.LastSyncAt);
+        Assert.Equal(143, reloadedService.Settings.LastSyncCount);
+    }
+
+    [Fact]
+    public async Task SyncCandidatesAsync_WhenZeroUploaded_DoesNotOverwriteExistingLastSync()
+    {
+        var service = CreateServiceWithInvalidEndpoint();
+        var syncTime = new DateTime(2026, 9, 5, 20, 0, 0);
+        service.UpdateSettings(new DriveSyncSettings
+        {
+            WebAppUrl = "http://127.0.0.1:1/exec",
+            LastSyncAt = syncTime,
+            LastSyncCount = 10
+        });
+
+        var trackedCandidate = new ClaudeDiscoveryCandidate
+        {
+            FilePath = "unused.md",
+            RelativePath = "unused.md",
+            IsTrackedByGit = true
+        };
+
+        await service.SyncCandidatesAsync(new[] { trackedCandidate });
+
+        Assert.Equal(syncTime, service.Settings.LastSyncAt);
+        Assert.Equal(10, service.Settings.LastSyncCount);
+    }
 }

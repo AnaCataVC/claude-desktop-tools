@@ -117,5 +117,6 @@ public class ClaudeDiscoveryReport
     public List<ClaudeDiscoveryCandidate> Candidates { get; set; } = new();
     public int RepositoriesScanned { get; set; }
     public int UntrackedCandidatesCount { get; set; }
+    public int TotalCandidatesCount { get; set; }
     public DateTime ScannedAt { get; set; } = DateTime.Now;
 }

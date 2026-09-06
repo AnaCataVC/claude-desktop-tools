@@ -39,8 +39,6 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Command="{x:Bind ViewModel.SelectAllCommand}" Content="Seleccionar todo" />
                 <Button Command="{x:Bind ViewModel.DeselectAllCommand}" Content="Deseleccionar todo" />
-                <Button Command="{x:Bind ViewModel.DeselectGitTrackedCommand}" Content="Deseleccionar git-tracked"
-                        ToolTipService.ToolTip="Deselecciona los archivos que ya tienen seguimiento git, dejando el resto como está." />
             </StackPanel>
 
             <StackPanel Spacing="4">
@@ -88,10 +86,10 @@
                         <Button Grid.Column="0"
                                 Command="{x:Bind ViewModel.SyncToDriveCommand}"
                                 IsEnabled="{x:Bind ViewModel.CanSyncToDrive, Mode=OneWay}"
-                                ToolTipService.ToolTip="Configura la Web App de Google Drive en Ajustes para habilitar esto.">
+                                ToolTipService.ToolTip="{x:Bind ViewModel.SyncButtonToolTip, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE753;" />
-                                <TextBlock Text="Sincronizar sin seguimiento a Drive" />
+                                <TextBlock Text="{x:Bind ViewModel.SyncButtonText, Mode=OneWay}" />
                             </StackPanel>
                         </Button>
                         <Button Grid.Column="1" Margin="8,0,0,0"
@@ -102,9 +100,12 @@
                                 <TextBlock Text="Cancelar" />
                             </StackPanel>
                         </Button>
-                        <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.DriveSyncStatusMessage, Mode=OneWay}"
-                                   VerticalAlignment="Center" Margin="12,0,0,0"
-                                   Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="12,0,0,0" Spacing="2">
+                            <TextBlock Text="{x:Bind ViewModel.DriveSyncStatusMessage, Mode=OneWay}"
+                                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.LastSyncDisplay, Mode=OneWay}"
+                                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                         <TextBlock Grid.Column="3" VerticalAlignment="Center"
                                    Visibility="{x:Bind BoolToVisibility(ViewModel.IsSyncingToDrive), Mode=OneWay}"
                                    Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold">
@@ -156,7 +157,7 @@
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                             BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,4">
-                                        <Grid ColumnDefinitions="Auto, *, Auto, Auto">
+                                        <Grid ColumnDefinitions="Auto, *, Auto">
                                             <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
                                                       IsChecked="{x:Bind IsSelected, Mode=TwoWay}" />
 
@@ -171,12 +172,6 @@
                                                 <TextBlock Text="{x:Bind LastModified}" Style="{ThemeResource CaptionTextBlockStyle}"
                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" />
                                             </StackPanel>
-
-                                            <Border Grid.Column="3" VerticalAlignment="Center" CornerRadius="4" Padding="8,4"
-                                                    Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                                <TextBlock Text="{x:Bind StatusBadge}"
-                                                           Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
-                                            </Border>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

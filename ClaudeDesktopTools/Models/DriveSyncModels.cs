@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ClaudeDesktopTools.Models;
@@ -13,6 +14,12 @@ public class DriveSyncSettings
 
     /// <summary>Bucket for CLAUDE.md/references with no owning Git repo.</summary>
     public string NoRepoBucketName { get; set; } = "_sin-repo";
+
+    /// <summary>Timestamp of the last successful Drive sync.</summary>
+    public DateTime? LastSyncAt { get; set; }
+
+    /// <summary>Number of files successfully uploaded in the last Drive sync.</summary>
+    public int LastSyncCount { get; set; }
 }
 
 public class DriveSyncResult

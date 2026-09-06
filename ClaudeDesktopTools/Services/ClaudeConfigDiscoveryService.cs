@@ -181,6 +181,7 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         }
 
         report.RepositoriesScanned = repoCandidateMap.Count;
+        report.TotalCandidatesCount = directCandidates.Distinct(StringComparer.OrdinalIgnoreCase).Count();
 
         // Check git tracking in batches of 50
         foreach (var kvp in repoCandidateMap)
@@ -197,6 +198,8 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                 var absPath = files[i];
                 var relPath = relFiles[i];
                 var isTracked = tracked.Contains(relPath.Replace('/', Path.DirectorySeparatorChar));
+                if (isTracked) continue;
+
                 var fi = new FileInfo(absPath);
 
                 report.Candidates.Add(new ClaudeDiscoveryCandidate
@@ -205,14 +208,14 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                     RelativePath = relPath,
                     RepositoryRoot = repoRoot,
                     Category = categoryByPath.TryGetValue(absPath, out var candidateCategory) ? candidateCategory : ClaudeDiscoveryCategory.Context,
-                    IsTrackedByGit = isTracked,
+                    IsTrackedByGit = false,
                     FileSizeBytes = fi.Exists ? fi.Length : 0,
                     LastModified = fi.Exists ? fi.LastWriteTime : DateTime.Now
                 });
             }
         }
 
-        report.UntrackedCandidatesCount = report.Candidates.Count(c => !c.IsTrackedByGit);
+        report.UntrackedCandidatesCount = report.Candidates.Count;
         return report;
     }
 
