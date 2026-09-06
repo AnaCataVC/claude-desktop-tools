@@ -3,7 +3,7 @@
 ; Then compile: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\ClaudeDesktopTools.iss
 
 #define MyAppName "Claude Desktop Tools"
-#define MyAppVersion "1.6.0"
+#define MyAppVersion "1.6.1"
 #define MyAppPublisher "AnaCataVC"
 #define MyAppExeName "ClaudeDesktopTools.exe"
 #define PublishDir "..\ClaudeDesktopTools\bin\publish\win-x64"
