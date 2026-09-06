@@ -3,7 +3,7 @@
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?logo=windows&logoColor=white)](https://microsoft.github.io/microsoft-ui-xaml/)
 [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-2.4-0078D4)](https://learn.microsoft.com/windows/apps/windows-app-sdk/)
-[![xUnit](https://img.shields.io/badge/Tests-xUnit%20(102%20passing)-brightgreen)](https://xunit.net/)
+[![xUnit](https://img.shields.io/badge/Tests-xUnit%20(107%20passing)-brightgreen)](https://xunit.net/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Native Windows 11 desktop application crafted with **WinUI 3**, **.NET 9**, Fluent Design, and Mica backdrop. It acts as an autonomous visual command center to audit local storage, safely maintain session indexes, prune stale transcripts, back up steering configurations to the cloud, and discover project-level AI context (`CLAUDE.md`, skills, agents, hooks) for both **Claude Code (CLI)** and **Claude Desktop**.
@@ -61,12 +61,12 @@ claude-desktop-tools/
 │   ├── Services/                     # Maintenance, ConfigDiscovery, DriveSync & ProcessMonitor services
 │   ├── ViewModels/                   # Reactive MVVM ViewModels (CommunityToolkit.Mvvm)
 │   └── Views/                        # Fluent Design Views (Dashboard, Sessions, Context, ProcessMonitor, Settings)
-└── ClaudeDesktopTools.Tests/         # Pure .NET 9 xUnit Test Suite (93 tests passing)
+└── ClaudeDesktopTools.Tests/         # Pure .NET 9 xUnit Test Suite (107 tests passing)
 ```
 
 ### Installation & Local Setup
 #### Option 1: Official Windows Installer (Recommended)
-Download the latest `ClaudeDesktopToolsSetup-1.5.0.exe` from [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) and follow the modern setup wizard.
+Download the latest `ClaudeDesktopToolsSetup-1.6.1.exe` from [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) and follow the modern setup wizard.
 
 #### Option 2: Build and Run from Source
 Prerequisites: Windows 11 (build 22000 or newer) and [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (`9.0.317` or newer).
@@ -74,7 +74,7 @@ Prerequisites: Windows 11 (build 22000 or newer) and [.NET 9 SDK](https://dotnet
 # Restore dependencies and build solution
 dotnet build ClaudeDesktopTools.sln -p:Platform=x64
 
-# Run automated tests (93 passing)
+# Run automated tests (107 passing)
 dotnet test ClaudeDesktopTools.sln
 
 # Launch application
@@ -107,14 +107,14 @@ Al colaborar intensamente con Claude Code (CLI) y Claude Desktop en múltiples r
 
 ### Instalación y Ejecución Local
 #### Opción 1: Instalador Oficial para Windows (Recomendado)
-Descarga el archivo `ClaudeDesktopToolsSetup-1.5.0.exe` desde [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) y sigue el asistente interactivo.
+Descarga el archivo `ClaudeDesktopToolsSetup-1.6.1.exe` desde [GitHub Releases](https://github.com/AnaCataVC/claude-desktop-tools/releases) y sigue el asistente interactivo.
 
 #### Opción 2: Compilar y Ejecutar desde el Código Fuente
 ```powershell
 # Compilar la solución en plataforma x64
 dotnet build ClaudeDesktopTools.sln -p:Platform=x64
 
-# Ejecutar la suite de 93 pruebas unitarias
+# Ejecutar la suite de 107 pruebas unitarias
 dotnet test ClaudeDesktopTools.sln
 
 # Ejecutar la aplicación de escritorio
