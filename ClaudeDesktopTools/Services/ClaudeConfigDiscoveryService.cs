@@ -119,8 +119,31 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
                     CollectCategoryFiles(dotClaudeDir, "agents", 1, ClaudeDiscoveryCategory.Agent, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
                     CollectCategoryFiles(dotClaudeDir, "scheduled-tasks", 3, ClaudeDiscoveryCategory.ScheduledTask, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
 
+                    // Subagent persistent memory: .claude/agent-memory/<agent-role>/*.md
+                    CollectCategoryFiles(dotClaudeDir, "agent-memory", 3, ClaudeDiscoveryCategory.AgentMemory, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
                     // Hooks are scripts, not Markdown -- same secret/name filtering, different extension allow-list.
                     CollectCategoryFiles(dotClaudeDir, "hooks", 1, ClaudeDiscoveryCategory.Hook, IsHookScriptAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+                    // CLI project memory: ~/.claude/projects/<slug>/memory/*.md
+                    var projectsDir = Path.Combine(dotClaudeDir, "projects");
+                    if (Directory.Exists(projectsDir))
+                    {
+                        foreach (var projDir in Directory.GetDirectories(projectsDir))
+                        {
+                            var projMemoryDir = Path.Combine(projDir, "memory");
+                            if (Directory.Exists(projMemoryDir))
+                            {
+                                foreach (var f in SafeEnumerateFilesRecursive(projMemoryDir, 2))
+                                {
+                                    if (!IsCandidateAllowed(f)) continue;
+                                    directCandidates.Add(f);
+                                    categoryByPath[f] = ClaudeDiscoveryCategory.ProjectMemory;
+                                    explicitRelativePath[f] = Path.GetRelativePath(dotClaudeDir, f).Replace('\\', '/');
+                                }
+                            }
+                        }
+                    }
                 }
             }
             catch { }

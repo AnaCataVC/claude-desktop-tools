@@ -13,9 +13,11 @@ public static class ClaudeDiscoveryCategory
     public const string Agent = "Agente";
     public const string ScheduledTask = "Tarea Programada";
     public const string Hook = "Hook";
+    public const string AgentMemory = "Memoria de Agente";
+    public const string ProjectMemory = "Memoria de Proyecto";
 
     /// <summary>Display order used when grouping candidates in the UI.</summary>
-    public static readonly string[] DisplayOrder = { Context, Skill, Agent, ScheduledTask, Hook };
+    public static readonly string[] DisplayOrder = { Context, Skill, Agent, ScheduledTask, Hook, AgentMemory, ProjectMemory };
 }
 
 public class ClaudeDiscoveryCandidate : INotifyPropertyChanged

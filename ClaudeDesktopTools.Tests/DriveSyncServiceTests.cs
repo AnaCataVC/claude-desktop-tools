@@ -83,6 +83,51 @@ public class DriveSyncServiceTests : IDisposable
     }
 
     [Fact]
+    public void BuildDriveRelativePath_UsesClaudeConfigSegmentForAgentMemoryWithNoRepo()
+    {
+        var candidate = new ClaudeDiscoveryCandidate
+        {
+            RepositoryRoot = string.Empty,
+            RelativePath = "agent-memory/qa-tester/MEMORY.md",
+            Category = ClaudeDiscoveryCategory.AgentMemory
+        };
+
+        string result = DriveSyncService.BuildDriveRelativePath(candidate, "claude-md-unversioned");
+
+        Assert.Equal("claude-md-unversioned/_claude-config/agent-memory/qa-tester/MEMORY.md", result);
+    }
+
+    [Fact]
+    public void BuildDriveRelativePath_UsesRepoSegmentForAgentMemoryWithRepo()
+    {
+        var candidate = new ClaudeDiscoveryCandidate
+        {
+            RepositoryRoot = @"C:\Users\someone\Repos\agents-workspace",
+            RelativePath = ".claude/agent-memory/qa-tester/MEMORY.md",
+            Category = ClaudeDiscoveryCategory.AgentMemory
+        };
+
+        string result = DriveSyncService.BuildDriveRelativePath(candidate, "claude-md-unversioned");
+
+        Assert.Equal("claude-md-unversioned/agents-workspace/.claude/agent-memory/qa-tester/MEMORY.md", result);
+    }
+
+    [Fact]
+    public void BuildDriveRelativePath_UsesClaudeConfigSegmentForProjectMemoryWithNoRepo()
+    {
+        var candidate = new ClaudeDiscoveryCandidate
+        {
+            RepositoryRoot = string.Empty,
+            RelativePath = "projects/my-project/memory/MEMORY.md",
+            Category = ClaudeDiscoveryCategory.ProjectMemory
+        };
+
+        string result = DriveSyncService.BuildDriveRelativePath(candidate, "claude-md-unversioned");
+
+        Assert.Equal("claude-md-unversioned/_claude-config/projects/my-project/memory/MEMORY.md", result);
+    }
+
+    [Fact]
     public void BuildDriveRelativePath_FallsBackToDefaultPrefixWhenBlank()
     {
         var candidate = new ClaudeDiscoveryCandidate { RepositoryRoot = string.Empty, RelativePath = "CLAUDE.md" };

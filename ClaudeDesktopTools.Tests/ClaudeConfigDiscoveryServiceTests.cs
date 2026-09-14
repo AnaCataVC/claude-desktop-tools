@@ -112,6 +112,12 @@ public class ClaudeConfigDiscoveryServiceTests : IDisposable
         File.WriteAllText(Path.Combine(dotClaudeDir, "hooks", "my-hook.ps1"), "Write-Host 'hi'");
         File.WriteAllText(Path.Combine(dotClaudeDir, "hooks", "state.json"), "{}"); // non-script, must be ignored
 
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "agent-memory", "qa-tester"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "agent-memory", "qa-tester", "MEMORY.md"), "# QA Tester Memory");
+
+        Directory.CreateDirectory(Path.Combine(dotClaudeDir, "projects", "my-project", "memory"));
+        File.WriteAllText(Path.Combine(dotClaudeDir, "projects", "my-project", "memory", "MEMORY.md"), "# Project Memory");
+
         var service = new ClaudeConfigDiscoveryService();
         var report = await service.DiscoverAsync(_tempDir, maxDepth: 3);
 
@@ -126,6 +132,12 @@ public class ClaudeConfigDiscoveryServiceTests : IDisposable
 
         var hook = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.Hook);
         Assert.Equal("hooks/my-hook.ps1", hook.RelativePath);
+
+        var agentMemory = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.AgentMemory);
+        Assert.Equal("agent-memory/qa-tester/MEMORY.md", agentMemory.RelativePath);
+
+        var projectMemory = Assert.Single(report.Candidates, c => c.Category == ClaudeDiscoveryCategory.ProjectMemory);
+        Assert.Equal("projects/my-project/memory/MEMORY.md", projectMemory.RelativePath);
 
         Assert.DoesNotContain(report.Candidates, c => c.FilePath.EndsWith("state.json"));
     }
