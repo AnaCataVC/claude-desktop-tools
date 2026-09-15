@@ -15,9 +15,12 @@ public static class ClaudeDiscoveryCategory
     public const string Hook = "Hook";
     public const string AgentMemory = "Memoria de Agente";
     public const string ProjectMemory = "Memoria de Proyecto";
+    public const string GlobalSetting = "Configuración Global";
+    public const string Keybinding = "Atajos de Teclado";
+    public const string McpConfig = "Configuración MCP";
 
     /// <summary>Display order used when grouping candidates in the UI.</summary>
-    public static readonly string[] DisplayOrder = { Context, Skill, Agent, ScheduledTask, Hook, AgentMemory, ProjectMemory };
+    public static readonly string[] DisplayOrder = { Context, Skill, Agent, ScheduledTask, Hook, AgentMemory, ProjectMemory, GlobalSetting, Keybinding, McpConfig };
 }
 
 public class ClaudeDiscoveryCandidate : INotifyPropertyChanged

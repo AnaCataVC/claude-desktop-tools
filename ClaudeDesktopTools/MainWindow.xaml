@@ -8,7 +8,7 @@
     <Grid>
         <NavigationView
             x:Name="NavView"
-            PaneDisplayMode="Left"
+            PaneDisplayMode="Auto"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
             SelectionChanged="NavView_SelectionChanged"

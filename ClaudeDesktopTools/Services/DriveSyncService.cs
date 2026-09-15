@@ -113,7 +113,12 @@ public class DriveSyncService : IDriveSyncService
             }
 
             string relativePath = BuildDriveRelativePath(candidate, _settings.DestinationPrefix, _settings.NoRepoBucketName, _settings.ClaudeConfigBucketName);
-            string mimeType = candidate.Category == ClaudeDiscoveryCategory.Hook ? "text/plain" : "text/markdown";
+            string mimeType = candidate.Category switch
+            {
+                ClaudeDiscoveryCategory.Hook => "text/plain",
+                ClaudeDiscoveryCategory.GlobalSetting or ClaudeDiscoveryCategory.Keybinding or ClaudeDiscoveryCategory.McpConfig => "application/json",
+                _ => "text/markdown"
+            };
             var (success, message) = await PostFileAsync(fileName, relativePath, mimeType, bytes, cancellationToken);
 
             if (success)

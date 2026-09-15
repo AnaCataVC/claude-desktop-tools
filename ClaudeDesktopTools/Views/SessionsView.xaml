@@ -8,51 +8,57 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid RowDefinitions="Auto, Auto, Auto, *">
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
-            <TextBlock Text="Explorador de Sesiones de Claude Code" Style="{ThemeResource TitleTextBlockStyle}" />
-            <TextBlock Text="Sesiones de la CLI por carpeta de proyecto, según sus transcripts en el perfil, y su estado de retención."
-                       Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
-
-        <!-- Action Bar -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
-            <Button Command="{x:Bind ViewModel.LoadSessionsCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72C;" />
-                    <TextBlock Text="Actualizar Lista" />
+    <!--
+        The whole page's header + action bars live in ListView.Header instead of separate Grid
+        rows above the list: a Grid with Auto rows above the list's "*" row gets clipped with no
+        way to scroll to it once the window is shorter than the Auto content (e.g. not maximized,
+        or a small screen). Putting them in the Header makes the ListView the single scroll region
+        for the whole page, header included.
+    -->
+    <ListView ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}" SelectionMode="None">
+        <ListView.Header>
+            <StackPanel Spacing="12" Margin="0,0,0,4">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Explorador de Sesiones de Claude Code" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBlock Text="Sesiones de la CLI por carpeta de proyecto, según sus transcripts en el perfil, y su estado de retención."
+                               Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-            </Button>
-            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="20" Height="20" />
-            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" VerticalAlignment="Center"
-                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
 
-        <!-- Bulk Delete Bar (inactive sessions only) -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="20" Margin="0,0,0,16" VerticalAlignment="Center">
-            <Button Click="DeleteAllInactive_Click">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE74D;" />
-                    <TextBlock Text="Eliminar todas las inactivas" />
+                <!-- Action Bar -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Command="{x:Bind ViewModel.LoadSessionsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" />
+                            <TextBlock Text="Actualizar Lista" />
+                        </StackPanel>
+                    </Button>
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="20" Height="20" />
+                    <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" VerticalAlignment="Center"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-            </Button>
 
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock Text="Eliminar inactivas de más de" VerticalAlignment="Center" Style="{ThemeResource BodyTextBlockStyle}" />
-                <NumberBox Value="{x:Bind ViewModel.BulkDeleteOlderThanDays, Mode=TwoWay}" Minimum="0" Maximum="365" Width="80"
-                           SpinButtonPlacementMode="Compact" />
-                <TextBlock Text="días" VerticalAlignment="Center" Style="{ThemeResource BodyTextBlockStyle}" />
-                <Button Click="DeleteInactiveOlderThan_Click" ToolTipService.ToolTip="Eliminar las sesiones inactivas con más de esa antigüedad">
-                    <FontIcon Glyph="&#xE74D;" />
-                </Button>
+                <!-- Bulk Delete Bar (inactive sessions only) -->
+                <StackPanel Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
+                    <Button Click="DeleteAllInactive_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE74D;" />
+                            <TextBlock Text="Eliminar todas las inactivas" />
+                        </StackPanel>
+                    </Button>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="Eliminar inactivas de más de" VerticalAlignment="Center" Style="{ThemeResource BodyTextBlockStyle}" />
+                        <NumberBox Value="{x:Bind ViewModel.BulkDeleteOlderThanDays, Mode=TwoWay}" Minimum="0" Maximum="365" Width="80"
+                                   SpinButtonPlacementMode="Compact" />
+                        <TextBlock Text="días" VerticalAlignment="Center" Style="{ThemeResource BodyTextBlockStyle}" />
+                        <Button Click="DeleteInactiveOlderThan_Click" ToolTipService.ToolTip="Eliminar las sesiones inactivas con más de esa antigüedad">
+                            <FontIcon Glyph="&#xE74D;" />
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
-
-        <!-- Sessions List -->
-        <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}"
-                  SelectionMode="None">
-            <ListView.ItemTemplate>
+        </ListView.Header>
+        <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:ClaudeSessionItem">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -100,6 +106,5 @@
                     </Border>
                 </DataTemplate>
             </ListView.ItemTemplate>
-        </ListView>
-    </Grid>
+    </ListView>
 </Page>

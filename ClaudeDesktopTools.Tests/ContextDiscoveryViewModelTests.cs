@@ -31,9 +31,12 @@ public class ContextDiscoveryViewModelTests
     {
         var candidates = new[]
         {
+            MakeCandidate(ClaudeDiscoveryCategory.McpConfig),
             MakeCandidate(ClaudeDiscoveryCategory.Hook),
             MakeCandidate(ClaudeDiscoveryCategory.Context),
-            MakeCandidate(ClaudeDiscoveryCategory.Skill)
+            MakeCandidate(ClaudeDiscoveryCategory.Keybinding),
+            MakeCandidate(ClaudeDiscoveryCategory.Skill),
+            MakeCandidate(ClaudeDiscoveryCategory.GlobalSetting)
         };
         var vm = CreateViewModel(candidates);
 
@@ -41,7 +44,11 @@ public class ContextDiscoveryViewModelTests
 
         var categoriesInOrder = vm.GroupedCandidates.Select(g => g.Category).ToArray();
         Assert.Equal(
-            new[] { ClaudeDiscoveryCategory.Context, ClaudeDiscoveryCategory.Skill, ClaudeDiscoveryCategory.Hook },
+            new[]
+            {
+                ClaudeDiscoveryCategory.Context, ClaudeDiscoveryCategory.Skill, ClaudeDiscoveryCategory.Hook,
+                ClaudeDiscoveryCategory.GlobalSetting, ClaudeDiscoveryCategory.Keybinding, ClaudeDiscoveryCategory.McpConfig
+            },
             categoriesInOrder);
     }
 

@@ -1,13 +1,21 @@
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Graphics;
 using ClaudeDesktopTools.Views;
 
 namespace ClaudeDesktopTools;
 
 public sealed partial class MainWindow : Window
 {
+    // Below this, the header/action bar content some pages pack into their ListView.Header no
+    // longer fits comfortably next to the NavigationView pane -- a floor keeps a resized (or
+    // small-screen) window usable instead of relying on every page to reflow perfectly.
+    private const int MinWindowWidth = 900;
+    private const int MinWindowHeight = 600;
+
     public MainWindow()
     {
         this.InitializeComponent();
@@ -18,6 +26,19 @@ public sealed partial class MainWindow : Window
         if (System.IO.File.Exists(iconPath))
         {
             AppWindow.SetIcon(iconPath);
+        }
+
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.PreferredMinimumWidth = MinWindowWidth;
+            presenter.PreferredMinimumHeight = MinWindowHeight;
+        }
+
+        if (AppWindow.Size.Width < MinWindowWidth || AppWindow.Size.Height < MinWindowHeight)
+        {
+            AppWindow.Resize(new SizeInt32(
+                System.Math.Max(AppWindow.Size.Width, MinWindowWidth),
+                System.Math.Max(AppWindow.Size.Height, MinWindowHeight)));
         }
     }
 

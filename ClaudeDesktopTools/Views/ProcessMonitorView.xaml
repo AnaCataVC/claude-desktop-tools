@@ -7,66 +7,71 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid RowDefinitions="Auto, Auto, Auto, *">
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
-            <TextBlock Text="Monitoreo de Recursos de Claude" Style="{ThemeResource TitleTextBlockStyle}" />
-            <TextBlock Text="RAM y CPU en tiempo real de los procesos claude.exe en ejecución. Las acciones de esta vista sólo afectan procesos de Claude."
-                       Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
-
-        <!-- Aggregate Metrics -->
-        <Grid Grid.Row="1" ColumnSpacing="16" Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Procesos Activos" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <TextBlock Text="{x:Bind ViewModel.ProcessCount, Mode=OneWay}" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+    <!--
+        Header + metrics + action bar live in ListView.Header rather than separate Grid rows above
+        the list: see SessionsView.xaml for why (Auto rows above a "*" row get clipped with no
+        scroll once the window is shorter than their content).
+    -->
+    <ListView ItemsSource="{x:Bind ViewModel.Processes, Mode=OneWay}" SelectionMode="None">
+        <ListView.Header>
+            <StackPanel Spacing="16" Margin="0,0,0,4">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Monitoreo de Recursos de Claude" Style="{ThemeResource TitleTextBlockStyle}" />
+                    <TextBlock Text="RAM y CPU en tiempo real de los procesos claude.exe en ejecución. Las acciones de esta vista sólo afectan procesos de Claude."
+                               Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-            </Border>
 
-            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="RAM Total" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <TextBlock Text="{x:Bind ViewModel.TotalWorkingSetDisplay, Mode=OneWay}" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+                <!-- Aggregate Metrics -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Procesos Activos" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <TextBlock Text="{x:Bind ViewModel.ProcessCount, Mode=OneWay}" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="RAM Total" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <TextBlock Text="{x:Bind ViewModel.TotalWorkingSetDisplay, Mode=OneWay}" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="CPU Total" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                            <TextBlock Text="{x:Bind ViewModel.TotalCpuPercentDisplay, Mode=OneWay}"
+                                       Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Action Bar -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Command="{x:Bind ViewModel.RefreshCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" />
+                            <TextBlock Text="Actualizar Ahora" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" VerticalAlignment="Center"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{x:Bind ViewModel.ActionFeedbackMessage, Mode=OneWay}" VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </StackPanel>
-            </Border>
-
-            <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="CPU Total" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <TextBlock Text="{x:Bind ViewModel.TotalCpuPercentDisplay, Mode=OneWay}"
-                               Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                </StackPanel>
-            </Border>
-        </Grid>
-
-        <!-- Action Bar -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
-            <Button Command="{x:Bind ViewModel.RefreshCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72C;" />
-                    <TextBlock Text="Actualizar Ahora" />
-                </StackPanel>
-            </Button>
-            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" VerticalAlignment="Center"
-                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            <TextBlock Text="{x:Bind ViewModel.ActionFeedbackMessage, Mode=OneWay}" VerticalAlignment="Center"
-                       FontWeight="SemiBold"
-                       Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-        </StackPanel>
-
-        <!-- Process List -->
-        <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.Processes, Mode=OneWay}" SelectionMode="None">
-            <ListView.ItemTemplate>
+            </StackPanel>
+        </ListView.Header>
+        <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:ClaudeProcessInfo">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -110,6 +115,5 @@
                     </Border>
                 </DataTemplate>
             </ListView.ItemTemplate>
-        </ListView>
-    </Grid>
+    </ListView>
 </Page>

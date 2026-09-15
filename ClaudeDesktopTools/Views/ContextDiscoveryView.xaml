@@ -8,16 +8,23 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid RowDefinitions="Auto, Auto, *">
+    <!--
+        Header + config/action bar live in ListView.Header rather than separate Grid rows above
+        the list: see SessionsView.xaml for why (Auto rows above a "*" row get clipped with no
+        scroll once the window is shorter than their content, e.g. not maximized or a small screen).
+    -->
+    <ListView ItemsSource="{x:Bind ViewModel.GroupedCandidates, Mode=OneWay}" SelectionMode="None">
+        <ListView.Header>
+        <StackPanel Spacing="6" Margin="0,0,0,4">
         <!-- Header -->
-        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
+        <StackPanel Spacing="6" Margin="0,0,0,16">
             <TextBlock Text="Descubrimiento de Contexto IA (CLAUDE.md)" Style="{ThemeResource TitleTextBlockStyle}" />
             <TextBlock Text="Localiza CLAUDE.md, references, skills, agentes, tareas programadas y hooks (con análisis de secretos)."
                        Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
 
         <!-- Configuration and Action Bar -->
-        <StackPanel Grid.Row="1" Spacing="12" Margin="0,0,0,16">
+        <StackPanel Spacing="12" Margin="0,0,0,16">
             <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="12">
                 <TextBox Grid.Column="0" Header="Directorio raíz a explorar"
                          Text="{x:Bind ViewModel.TargetDirectory, Mode=TwoWay}" />
@@ -46,14 +53,21 @@
                 <TextBlock Text="Seleccionar sólo una categoría" Style="{ThemeResource CaptionTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <ItemsControl ItemsSource="{x:Bind ViewModel.AvailableCategories}">
+                    <!--
+                        A horizontal-only StackPanel overflows off the right edge with no way to
+                        reach the hidden items once there are enough categories to exceed the
+                        window width (hit once GlobalSetting/Keybinding/McpConfig were added).
+                        ItemsWrapGrid wraps to the next row instead, using each item's own Margin
+                        for spacing since it has no Spacing property like StackPanel.
+                    -->
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="8" />
+                            <ItemsWrapGrid Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="x:String">
-                            <Button Tag="{x:Bind}" Content="{x:Bind}" Click="SelectOnlyCategory_Click" />
+                            <Button Tag="{x:Bind}" Content="{x:Bind}" Margin="0,0,8,8" Click="SelectOnlyCategory_Click" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -68,12 +82,12 @@
                 <ItemsControl ItemsSource="{x:Bind ViewModel.CategoryFilters}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="12" />
+                            <ItemsWrapGrid Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:CategoryFilterOption">
-                            <CheckBox Content="{x:Bind Category}" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" />
+                            <CheckBox Content="{x:Bind Category}" Margin="0,0,12,8" IsChecked="{x:Bind IsChecked, Mode=TwoWay}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -131,11 +145,9 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-
-        <!-- Discovered Candidates, Grouped by Category -->
-        <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.GroupedCandidates, Mode=OneWay}"
-                  SelectionMode="None">
-            <ListView.ItemTemplate>
+        </StackPanel>
+        </ListView.Header>
+        <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:CandidateGroup">
                     <Expander Margin="0,12,0,4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                               IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
@@ -181,6 +193,5 @@
                     </Expander>
                 </DataTemplate>
             </ListView.ItemTemplate>
-        </ListView>
-    </Grid>
+    </ListView>
 </Page>

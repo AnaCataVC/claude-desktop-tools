@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using ClaudeDesktopTools.Helpers;
 using ClaudeDesktopTools.Models;
 using ClaudeDesktopTools.Services.Interfaces;
 
@@ -36,16 +39,36 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         new Regex(@"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*", RegexOptions.Compiled)
     };
 
+    /// <summary>
+    /// Value-shaped secret patterns for content that isn't behind a suspicious-looking key --
+    /// found via adversarial review: a bearer token or embedded URL credential commonly sits in an
+    /// "args" array element (e.g. mcp-remote's "--header", "Authorization: Bearer &lt;token&gt;") or a
+    /// plain "url" string, neither of which trips the key-name check in IsSensitiveMcpKey.
+    /// </summary>
+    private static readonly List<Regex> McpValueSecretPatterns = new()
+    {
+        new Regex(@"Bearer\s+[A-Za-z0-9\-_\.=]{16,}", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        new Regex(@"://[^/\s:@]+:[^/\s@]+@", RegexOptions.Compiled) // scheme://user:pass@host
+    };
+
     private static readonly HashSet<string> HookScriptExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".ps1", ".sh", ".py", ".js", ".cmd", ".bat"
     };
 
-    private readonly string _gitExecutable;
+    /// <summary>Key-name fragments (case-insensitive) that mark a JSON value as secret-shaped when sanitizing MCP config.</summary>
+    private static readonly string[] SensitiveMcpKeyFragments =
+    {
+        "token", "key", "secret", "password", "auth", "header", "env"
+    };
 
-    public ClaudeConfigDiscoveryService(string gitExecutable = "git")
+    private readonly string _gitExecutable;
+    private readonly string _homeDirectory;
+
+    public ClaudeConfigDiscoveryService(string gitExecutable = "git", string? homeDirectory = null)
     {
         _gitExecutable = gitExecutable;
+        _homeDirectory = homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     }
 
     public async Task<ClaudeDiscoveryReport> DiscoverAsync(string rootPath, int maxDepth = 4, CancellationToken cancellationToken = default)
@@ -58,6 +81,30 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         var directCandidates = new List<string>();
         var categoryByPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var explicitRelativePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // The user's chosen rootPath (typically a folder holding several project repos) never has
+        // to include the home directory, but the global ~/.claude config (user CLAUDE.md, global
+        // skills/agents/hooks, settings.json, keybindings.json) only lives there. Process it once,
+        // directly, instead of seeding the BFS with the home directory itself -- that would walk
+        // every unrelated folder under home (Documents, Downloads, ...) up to maxDepth deep.
+        var homeClaudeDir = Path.Combine(_homeDirectory, ".claude");
+        var homeAlreadyCoveredByRoot = string.Equals(Path.GetFullPath(rootPath).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(_homeDirectory).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+        if (!homeAlreadyCoveredByRoot && Directory.Exists(homeClaudeDir))
+        {
+            CollectFromDotClaudeDir(homeClaudeDir, directCandidates, categoryByPath, explicitRelativePath);
+        }
+
+        // MCP server config lives in ~/.claude.json, not under ~/.claude/ -- and alongside oauth
+        // tokens and the full project/session history, so only the mcpServers block is extracted
+        // and secret-shaped values within it are redacted before the result becomes a candidate.
+        var homeClaudeJson = Path.Combine(_homeDirectory, ".claude.json");
+        var sanitizedMcpConfigPath = Path.Combine(Path.GetDirectoryName(LocalSettingsHelper.SettingsFilePath) ?? Path.GetTempPath(), "mcp-config.sanitized.json");
+        if (ExtractSanitizedMcpConfig(homeClaudeJson, sanitizedMcpConfigPath))
+        {
+            directCandidates.Add(sanitizedMcpConfigPath);
+            categoryByPath[sanitizedMcpConfigPath] = ClaudeDiscoveryCategory.McpConfig;
+            explicitRelativePath[sanitizedMcpConfigPath] = "mcp-config.sanitized.json";
+        }
 
         // Enumerate candidates using BFS
         var queue = new Queue<(string Path, int Depth)>();
@@ -98,52 +145,7 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
 
                 if (Directory.Exists(dotClaudeDir))
                 {
-                    var dotClaudeFile = Path.Combine(dotClaudeDir, "CLAUDE.md");
-                    if (hasDotClaudeFile && IsCandidateAllowed(dotClaudeFile))
-                    {
-                        directCandidates.Add(dotClaudeFile);
-                    }
-
-                    var dotClaudeRefs = Path.Combine(dotClaudeDir, "references");
-                    if (Directory.Exists(dotClaudeRefs))
-                    {
-                        foreach (var f in SafeEnumerateFilesRecursive(dotClaudeRefs, 3))
-                        {
-                            if (IsCandidateAllowed(f)) directCandidates.Add(f);
-                        }
-                    }
-
-                    // Skills, agents and scheduled tasks are all just Markdown definitions living
-                    // under their own well-known folder -- same discovery rules as references/.
-                    CollectCategoryFiles(dotClaudeDir, "skills", 3, ClaudeDiscoveryCategory.Skill, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
-                    CollectCategoryFiles(dotClaudeDir, "agents", 1, ClaudeDiscoveryCategory.Agent, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
-                    CollectCategoryFiles(dotClaudeDir, "scheduled-tasks", 3, ClaudeDiscoveryCategory.ScheduledTask, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
-
-                    // Subagent persistent memory: .claude/agent-memory/<agent-role>/*.md
-                    CollectCategoryFiles(dotClaudeDir, "agent-memory", 3, ClaudeDiscoveryCategory.AgentMemory, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
-
-                    // Hooks are scripts, not Markdown -- same secret/name filtering, different extension allow-list.
-                    CollectCategoryFiles(dotClaudeDir, "hooks", 1, ClaudeDiscoveryCategory.Hook, IsHookScriptAllowed, directCandidates, categoryByPath, explicitRelativePath);
-
-                    // CLI project memory: ~/.claude/projects/<slug>/memory/*.md
-                    var projectsDir = Path.Combine(dotClaudeDir, "projects");
-                    if (Directory.Exists(projectsDir))
-                    {
-                        foreach (var projDir in Directory.GetDirectories(projectsDir))
-                        {
-                            var projMemoryDir = Path.Combine(projDir, "memory");
-                            if (Directory.Exists(projMemoryDir))
-                            {
-                                foreach (var f in SafeEnumerateFilesRecursive(projMemoryDir, 2))
-                                {
-                                    if (!IsCandidateAllowed(f)) continue;
-                                    directCandidates.Add(f);
-                                    categoryByPath[f] = ClaudeDiscoveryCategory.ProjectMemory;
-                                    explicitRelativePath[f] = Path.GetRelativePath(dotClaudeDir, f).Replace('\\', '/');
-                                }
-                            }
-                        }
-                    }
+                    CollectFromDotClaudeDir(dotClaudeDir, directCandidates, categoryByPath, explicitRelativePath);
                 }
             }
             catch { }
@@ -304,6 +306,27 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
         return true;
     }
 
+    public static bool IsJsonConfigAllowed(string filePath)
+    {
+        var ext = Path.GetExtension(filePath);
+        if (!string.Equals(ext, ".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var fileName = Path.GetFileName(filePath);
+        foreach (var keyword in SensitiveNameKeywords)
+        {
+            if (fileName.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        if (HasInfrastructureSecret(filePath))
+            return false;
+
+        return true;
+    }
+
     public static bool HasInfrastructureSecret(string filePath)
     {
         try
@@ -318,18 +341,223 @@ public class ClaudeConfigDiscoveryService : IClaudeConfigDiscoveryService
             if (read <= 0) return false;
 
             var content = new string(buffer, 0, read);
-            foreach (var pattern in InfrastructureSecretPatterns)
-            {
-                if (pattern.IsMatch(content))
-                    return true;
-            }
-
-            return false;
+            return MatchesAnySecretPattern(content, InfrastructureSecretPatterns);
         }
         catch
         {
             return false;
         }
+    }
+
+    private static bool MatchesAnySecretPattern(string content, IEnumerable<Regex> patterns)
+    {
+        foreach (var pattern in patterns)
+        {
+            if (pattern.IsMatch(content))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Everything discoverable inside a single .claude/ folder: CLAUDE.md, references, skills,
+    /// agents, scheduled tasks, agent memory, hooks, CLI project memory, and the loose global
+    /// config files (settings.json/settings.local.json/keybindings.json) that only live directly
+    /// under .claude/ rather than in their own subfolder.
+    /// </summary>
+    private static void CollectFromDotClaudeDir(
+        string dotClaudeDir,
+        List<string> directCandidates,
+        Dictionary<string, string> categoryByPath,
+        Dictionary<string, string> explicitRelativePath)
+    {
+        var dotClaudeFile = Path.Combine(dotClaudeDir, "CLAUDE.md");
+        if (File.Exists(dotClaudeFile) && IsCandidateAllowed(dotClaudeFile))
+        {
+            directCandidates.Add(dotClaudeFile);
+        }
+
+        var dotClaudeRefs = Path.Combine(dotClaudeDir, "references");
+        if (Directory.Exists(dotClaudeRefs))
+        {
+            foreach (var f in SafeEnumerateFilesRecursive(dotClaudeRefs, 3))
+            {
+                if (IsCandidateAllowed(f)) directCandidates.Add(f);
+            }
+        }
+
+        // Skills, agents and scheduled tasks are all just Markdown definitions living
+        // under their own well-known folder -- same discovery rules as references/.
+        CollectCategoryFiles(dotClaudeDir, "skills", 3, ClaudeDiscoveryCategory.Skill, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+        CollectCategoryFiles(dotClaudeDir, "agents", 1, ClaudeDiscoveryCategory.Agent, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+        CollectCategoryFiles(dotClaudeDir, "scheduled-tasks", 3, ClaudeDiscoveryCategory.ScheduledTask, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+        // Subagent persistent memory: .claude/agent-memory/<agent-role>/*.md
+        CollectCategoryFiles(dotClaudeDir, "agent-memory", 3, ClaudeDiscoveryCategory.AgentMemory, IsCandidateAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+        // Hooks are scripts, not Markdown -- same secret/name filtering, different extension allow-list.
+        CollectCategoryFiles(dotClaudeDir, "hooks", 1, ClaudeDiscoveryCategory.Hook, IsHookScriptAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+        // Loose global config files sitting directly under .claude/, not in their own subfolder.
+        CollectSingleFile(dotClaudeDir, "settings.json", ClaudeDiscoveryCategory.GlobalSetting, IsJsonConfigAllowed, directCandidates, categoryByPath, explicitRelativePath);
+        CollectSingleFile(dotClaudeDir, "settings.local.json", ClaudeDiscoveryCategory.GlobalSetting, IsJsonConfigAllowed, directCandidates, categoryByPath, explicitRelativePath);
+        CollectSingleFile(dotClaudeDir, "keybindings.json", ClaudeDiscoveryCategory.Keybinding, IsJsonConfigAllowed, directCandidates, categoryByPath, explicitRelativePath);
+
+        // CLI project memory: ~/.claude/projects/<slug>/memory/*.md
+        var projectsDir = Path.Combine(dotClaudeDir, "projects");
+        if (Directory.Exists(projectsDir))
+        {
+            foreach (var projDir in Directory.GetDirectories(projectsDir))
+            {
+                var projMemoryDir = Path.Combine(projDir, "memory");
+                if (Directory.Exists(projMemoryDir))
+                {
+                    foreach (var f in SafeEnumerateFilesRecursive(projMemoryDir, 2))
+                    {
+                        if (!IsCandidateAllowed(f)) continue;
+                        directCandidates.Add(f);
+                        categoryByPath[f] = ClaudeDiscoveryCategory.ProjectMemory;
+                        explicitRelativePath[f] = Path.GetRelativePath(dotClaudeDir, f).Replace('\\', '/');
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts only the mcpServers block(s) from ~/.claude.json (global "mcpServers" and any
+    /// per-project "projects.&lt;path&gt;.mcpServers") and redacts secret-shaped values inside them,
+    /// writing the sanitized result to outputPath. Returns false (and writes nothing) if the
+    /// source file is missing, unparseable, or has no mcpServers to extract.
+    /// Redaction is a heuristic keyed on JSON key names (see SensitiveMcpKeyFragments) -- it is
+    /// not a guarantee against every possible shape of secret.
+    /// </summary>
+    public static bool ExtractSanitizedMcpConfig(string claudeJsonPath, string outputPath)
+    {
+        try
+        {
+            if (!File.Exists(claudeJsonPath)) return false;
+
+            using var stream = File.OpenRead(claudeJsonPath);
+            using var doc = JsonDocument.Parse(stream);
+            var root = doc.RootElement;
+
+            var sanitized = new JsonObject();
+
+            if (root.TryGetProperty("mcpServers", out var globalServers) && globalServers.ValueKind == JsonValueKind.Object)
+            {
+                sanitized["mcpServers"] = SanitizeMcpJsonNode(JsonNode.Parse(globalServers.GetRawText()));
+            }
+
+            if (root.TryGetProperty("projects", out var projects) && projects.ValueKind == JsonValueKind.Object)
+            {
+                var perProjectServers = new JsonObject();
+                foreach (var project in projects.EnumerateObject())
+                {
+                    if (project.Value.TryGetProperty("mcpServers", out var projServers) &&
+                        projServers.ValueKind == JsonValueKind.Object &&
+                        projServers.EnumerateObject().Any())
+                    {
+                        perProjectServers[project.Name] = SanitizeMcpJsonNode(JsonNode.Parse(projServers.GetRawText()));
+                    }
+                }
+
+                if (perProjectServers.Count > 0)
+                {
+                    sanitized["projectMcpServers"] = perProjectServers;
+                }
+            }
+
+            if (sanitized.Count == 0) return false;
+
+            string json = sanitized.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+
+            // Defense in depth: the key-name and per-leaf-value passes above are heuristics and can
+            // miss a secret embedded in an unexpected shape (e.g. a bare token in a URL path segment
+            // that isn't preceded by "Bearer " or "user:pass@"). Rather than upload a partially
+            // redacted file, fail closed if anything still matches a known secret pattern.
+            if (MatchesAnySecretPattern(json, InfrastructureSecretPatterns) || MatchesAnySecretPattern(json, McpValueSecretPatterns))
+            {
+                return false;
+            }
+
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            File.WriteAllText(outputPath, json);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static JsonNode? SanitizeMcpJsonNode(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                var resultObj = new JsonObject();
+                foreach (var property in obj)
+                {
+                    if (IsSensitiveMcpKey(property.Key))
+                    {
+                        resultObj[property.Key] = "[REDACTED]";
+                    }
+                    else
+                    {
+                        resultObj[property.Key] = SanitizeMcpJsonNode(property.Value?.DeepClone());
+                    }
+                }
+                return resultObj;
+
+            case JsonArray array:
+                var resultArray = new JsonArray();
+                foreach (var item in array)
+                {
+                    resultArray.Add(SanitizeMcpJsonNode(item?.DeepClone()));
+                }
+                return resultArray;
+
+            default:
+                // Array elements and other leaf values have no key to check -- e.g. an "args" array
+                // commonly carries ["--header", "Authorization: Bearer <token>"] or a raw connection
+                // URL with embedded credentials. Scan the leaf value itself instead of trusting the
+                // parent key's name.
+                if (node is JsonValue value && value.TryGetValue(out string? stringValue) && stringValue != null &&
+                    (MatchesAnySecretPattern(stringValue, InfrastructureSecretPatterns) || MatchesAnySecretPattern(stringValue, McpValueSecretPatterns)))
+                {
+                    return "[REDACTED]";
+                }
+                return node?.DeepClone();
+        }
+    }
+
+    private static bool IsSensitiveMcpKey(string key)
+    {
+        foreach (var fragment in SensitiveMcpKeyFragments)
+        {
+            if (key.Contains(fragment, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
+
+    private static void CollectSingleFile(
+        string dotClaudeDir,
+        string fileName,
+        string category,
+        Func<string, bool> isAllowed,
+        List<string> directCandidates,
+        Dictionary<string, string> categoryByPath,
+        Dictionary<string, string> explicitRelativePath)
+    {
+        var filePath = Path.Combine(dotClaudeDir, fileName);
+        if (!File.Exists(filePath) || !isAllowed(filePath)) return;
+
+        directCandidates.Add(filePath);
+        categoryByPath[filePath] = category;
+        explicitRelativePath[filePath] = fileName;
     }
 
     private static void CollectCategoryFiles(
