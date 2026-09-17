@@ -190,6 +190,56 @@ public class DriveSyncServiceTests : IDisposable
         Assert.Contains("inválida", message);
     }
 
+    [Fact]
+    public void ParseResponse_ReadsPerFileErrorFromResultsArray()
+    {
+        var (success, message) = DriveSyncService.ParseResponse(
+            "{\"status\":\"success\",\"processedCount\":1,\"results\":[{\"relativePath\":\"a.md\",\"status\":\"error\",\"message\":\"Exception: bad data\"}]}");
+
+        Assert.False(success);
+        Assert.Equal("Exception: bad data", message);
+    }
+
+    [Fact]
+    public void ParseResponse_ReadsPerFileSuccessFromResultsArray()
+    {
+        var (success, message) = DriveSyncService.ParseResponse(
+            "{\"status\":\"success\",\"processedCount\":1,\"results\":[{\"relativePath\":\"a.md\",\"status\":\"success\",\"fileId\":\"abc\"}]}");
+
+        Assert.True(success);
+        Assert.Equal("OK", message);
+    }
+
+    [Fact]
+    public void ParseResponse_HandlesHtmlErrorPageFromDeadDeployment()
+    {
+        var (success, message) = DriveSyncService.ParseResponse("<!DOCTYPE html><html><body>No se pudo abrir el archivo</body></html>");
+
+        Assert.False(success);
+        Assert.Contains("deployment", message);
+    }
+
+    [Fact]
+    public async Task PostFileAsync_WithMalformedWebAppUrl_FailsWithoutThrowing()
+    {
+        var service = new DriveSyncService();
+        service.UpdateSettings(new DriveSyncSettings { WebAppUrl = "not a valid url\n" });
+        var candidate = CreateUntrackedFileCandidate("a.md");
+
+        try
+        {
+            var result = await service.SyncCandidatesAsync(new[] { candidate });
+
+            Assert.Equal(0, result.Uploaded);
+            Assert.Equal(1, result.Failed);
+            Assert.Contains(result.Errors, e => e.Contains("no es válida"));
+        }
+        finally
+        {
+            File.Delete(candidate.FilePath);
+        }
+    }
+
     [Theory]
     [InlineData(0, 10, 0)]
     [InlineData(5, 10, 50)]

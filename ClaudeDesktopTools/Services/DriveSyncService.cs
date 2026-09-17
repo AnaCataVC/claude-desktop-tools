@@ -15,8 +15,8 @@ namespace ClaudeDesktopTools.Services;
 
 /// <summary>
 /// Uploads discovered CLAUDE.md/references files to a Google Drive folder via a Google Apps
-/// Script Web App bridge (same contract as the "Work Activity Panel" sync feature: filename,
-/// relativePath, mimeType, data (base64) and authToken form fields, posted to a single /exec URL).
+/// Script Web App bridge, posted to a single /exec URL as a JSON body:
+/// {"authToken": "...", "files": [{"filename", "relativePath", "mimeType", "data" (base64)}]}.
 /// This avoids OAuth entirely -- the shared secret token is checked inside the deployed script.
 /// </summary>
 public class DriveSyncService : IDriveSyncService
@@ -190,21 +190,52 @@ public class DriveSyncService : IDriveSyncService
         return $"{prefix}/{suffix}";
     }
 
+    /// <summary>
+    /// Parses the Apps Script response for a single-file upload. The script always answers at
+    /// the top level with {"status":"success"|"error", ...}: a top-level "error" means the whole
+    /// request was rejected (e.g. bad auth token), while a top-level "success" carries a
+    /// "results" array with one entry per submitted file, each with its own "status"/"message" --
+    /// since this client posts one file per request, only the first result is relevant.
+    /// </summary>
     public static (bool Success, string Message) ParseResponse(string json)
     {
+        // Apps Script returns an HTML error page (starting with '<') instead of JSON when the
+        // deployment behind the Web App URL no longer exists or was redeployed under a new ID --
+        // catch that case explicitly instead of surfacing the raw JsonException.
+        if (json.TrimStart().StartsWith('<'))
+        {
+            return (false, "La Web App de Apps Script no respondió con JSON (recibió una página de error de Google). Es probable que la URL apunte a un deployment que ya no existe -- vuelve a desplegar el script y actualiza la URL en Ajustes.");
+        }
+
         try
         {
             using var doc = JsonDocument.Parse(json);
             var status = doc.RootElement.TryGetProperty("status", out var statusProp) ? statusProp.GetString() : null;
-            if (status == "success")
+            if (status != "success")
             {
-                return (true, "OK");
+                string topLevelMessage = doc.RootElement.TryGetProperty("message", out var messageProp)
+                    ? messageProp.GetString() ?? "Error desconocido"
+                    : "Error desconocido";
+                return (false, topLevelMessage);
             }
 
-            string message = doc.RootElement.TryGetProperty("message", out var messageProp)
-                ? messageProp.GetString() ?? "Error desconocido"
-                : "Error desconocido";
-            return (false, message);
+            if (doc.RootElement.TryGetProperty("results", out var resultsProp) && resultsProp.ValueKind == JsonValueKind.Array)
+            {
+                var firstResult = resultsProp.EnumerateArray().FirstOrDefault();
+                if (firstResult.ValueKind == JsonValueKind.Object)
+                {
+                    string? fileStatus = firstResult.TryGetProperty("status", out var fileStatusProp) ? fileStatusProp.GetString() : null;
+                    if (fileStatus == "error")
+                    {
+                        string fileMessage = firstResult.TryGetProperty("message", out var fileMessageProp)
+                            ? fileMessageProp.GetString() ?? "Error desconocido"
+                            : "Error desconocido";
+                        return (false, fileMessage);
+                    }
+                }
+            }
+
+            return (true, "OK");
         }
         catch (Exception ex)
         {
@@ -215,18 +246,35 @@ public class DriveSyncService : IDriveSyncService
     private async Task<(bool Success, string Message)> PostFileAsync(
         string fileName, string relativePath, string mimeType, byte[] data, CancellationToken cancellationToken)
     {
-        var form = new Dictionary<string, string>
+        // Validate up front instead of letting a malformed URL (stray character from a bad
+        // copy-paste, embedded newline, etc.) surface as a raw UriFormatException message.
+        if (!Uri.TryCreate(_settings.WebAppUrl, UriKind.Absolute, out var webAppUri) ||
+            (webAppUri.Scheme != Uri.UriSchemeHttp && webAppUri.Scheme != Uri.UriSchemeHttps))
         {
-            ["filename"] = fileName,
-            ["relativePath"] = relativePath,
-            ["mimeType"] = mimeType,
-            ["data"] = Convert.ToBase64String(data),
-            ["authToken"] = _settings.AuthToken
+            return (false, $"La URL de la Web App no es válida: \"{_settings.WebAppUrl}\". Revisa que no tenga espacios, saltos de línea u otro carácter inválido.");
+        }
+
+        // The Apps Script deployment expects a raw JSON body -- {authToken, files: [...]} -- not
+        // form-urlencoded fields; a bare form POST parses as invalid JSON server-side.
+        var payload = new
+        {
+            authToken = _settings.AuthToken,
+            files = new[]
+            {
+                new
+                {
+                    filename = fileName,
+                    relativePath,
+                    mimeType,
+                    data = Convert.ToBase64String(data)
+                }
+            }
         };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
         try
         {
-            using var response = await HttpClient.PostAsync(_settings.WebAppUrl, new FormUrlEncodedContent(form), cancellationToken);
+            using var response = await HttpClient.PostAsync(webAppUri, content, cancellationToken);
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             return ParseResponse(body);
         }
