@@ -1,3 +1,9 @@
+> **⚠️ Archived / Archivado**
+>
+> This project is no longer maintained. Its AI-directive backup to Google Drive continues in [google-drive-work-sync](https://github.com/AnaCataVC/google-drive-work-sync).
+>
+> Este proyecto ya no se mantiene. Su respaldo de directivas de IA a Google Drive siguió en [google-drive-work-sync](https://github.com/AnaCataVC/google-drive-work-sync).
+
 # Claude Desktop Tools
 
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
